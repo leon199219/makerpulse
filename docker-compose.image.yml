@@ -1,12 +1,14 @@
-# Run MakerPulse from a pre-built image (no source folder, no `build:`).
-# Build once:  docker build -t makerpulse:1.0 .
-# Or pull:     docker pull ghcr.io/leon199219/makerpulse:1.0
+# Run MakerPulse from a published image. No source tree, no `build:`.
+#
+# Default image: ghcr.io/leon199219/makerpulse:latest
+# Override:      MAKERPULSE_IMAGE=makerpulse:1.0 docker compose -f docker-compose.image.yml up -d
 #
 # Keep 8080 on the right. Change the left-hand host port if needed.
 
 services:
   makerpulse:
-    image: ${MAKERPULSE_IMAGE:-makerpulse:1.0}
+    image: ${MAKERPULSE_IMAGE:-ghcr.io/leon199219/makerpulse:latest}
+    pull_policy: always
     container_name: makerpulse
     restart: unless-stopped
     ports:

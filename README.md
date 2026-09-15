@@ -1,47 +1,51 @@
 # MakerPulse
 
-Self-hosted MakerWorld creator analytics. Tracks likes, collections, prints, downloads, comments, boosts, followers, and estimated points — per published model and as account totals. Optional Telegram summaries. English UI.
+Self-hosted **MakerWorld** creator analytics. Track likes, collections, prints, downloads, comments, boosts, followers, and estimated points — per published model and as account totals. Optional Telegram summaries. English UI.
 
-**Install in Docker Compose:** see [INSTALL.md](INSTALL.md) for requirements and a step-by-step (standalone stack, merge into an existing file, or run a pre-built **image**).
+[![Image](https://github.com/leon199219/makerpulse/actions/workflows/image.yml/badge.svg)](https://github.com/leon199219/makerpulse/actions/workflows/image.yml)
+[![GHCR](https://img.shields.io/badge/GHCR-leon199219%2Fmakerpulse-blue?logo=github)](https://github.com/leon199219/makerpulse/pkgs/container/makerpulse)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Docker Compose
+**Image:** `ghcr.io/leon199219/makerpulse:latest`
 
-The image is built from this project folder (`Dockerfile` + app source). You do **not** mount extra app files at runtime. Postgres data is the only volume.
+![Overview](screenshots/home.png)
 
-### Files to keep next to Compose
+| Overview | Models | Activity |
+| --- | --- | --- |
+| Period KPIs and charts (`1h`–`ALL`) | Sort by date or any metric | Filterable changelog |
 
-Place the MakerPulse project (or a copy of it) on the machine that runs Compose. The build context must include:
+## Features
 
-| Path | Why |
-| --- | --- |
-| `Dockerfile` | Image build |
-| `package.json` / `package-lock.json` | Dependencies |
-| `src/` `public/` `scripts/` `server/` `migrations/` | App |
-| `vite.config.ts` `tsconfig.json` | Build tooling |
+- Polls **public** MakerWorld data — no Creator Center login
+- Totals **and** per-model history
+- Period picker: `1h`, `4h`, `8h`, `24h`, `7D`, `30D`, `90D`, `ALL`
+- Activity feed with type filters
+- Optional **Telegram** bot (hourly / 6h / daily / weekly)
+- JSON API for Home Assistant / Grafana (`GET /api/stats`)
+- Reset tracking data from Settings
+- Single Docker service + Postgres
 
-Do **not** copy `node_modules` — the image runs `npm ci` itself. No bind-mounts are required for the UI or tracker.
+Not affiliated with Bambu Lab or MakerWorld. Points are **estimated** from public stats (`prints × 2 + boosts`, +25% on exclusive models).
 
-### Standalone stack
+Hardware companion: [MakerPulse-CYD](https://github.com/leon199219/MakerPulse-CYD) (ESP32 dashboard).
 
-From this folder:
+---
+
+## Quick start
+
+No source tree required. Use the published image.
 
 ```yaml
 services:
   makerpulse:
-    build: .
-    container_name: makerpulse
+    image: ghcr.io/leon199219/makerpulse:latest
+    pull_policy: always
     restart: unless-stopped
     ports:
-      # HOST:CONTAINER — container always listens on 8080.
-      # Map any free host port on the left, e.g. "3001:8080".
-      - "${MAKERPULSE_PORT:-8080}:8080"
+      - "8080:8080"          # host:container — keep 8080 on the right
     environment:
       DATABASE_URL: postgres://makerpulse:makerpulse@db:5432/makerpulse
-      MAKERWORLD_UID: "123456789"
       POLL_INTERVAL_MINUTES: "30"
-      TELEGRAM_BOT_TOKEN: ""
-      TELEGRAM_CHAT_ID: ""
-      TELEGRAM_CADENCE: "daily"
     depends_on:
       db:
         condition: service_healthy
@@ -65,60 +69,118 @@ volumes:
   makerpulse-data:
 ```
 
-Set a different host port with `MAKERPULSE_PORT=3001` in the same directory as Compose, or write `"3001:8080"` directly.
+```bash
+docker compose up -d
+```
 
-### Merge into an existing Compose file
+Open the UI on port `8080`. In **Settings**, paste a MakerWorld user ID or a model URL.
 
-1. Copy the MakerPulse project into a subfolder, e.g. `./makerpulse/`.
-2. Add the `makerpulse` service with `build: ./makerpulse`.
-3. Keep the right-hand port at `8080`. Change only the left-hand host port if needed:
+**Ready-made file:** [docker-compose.image.yml](docker-compose.image.yml)
+
+The image name **must** include the registry:
+
+```yaml
+image: ghcr.io/leon199219/makerpulse:latest   # correct
+# image: makerpulse:latest                    # looks on Docker Hub → pull denied
+```
+
+---
+
+## Update
+
+```bash
+docker compose pull makerpulse
+docker compose up -d --force-recreate makerpulse
+```
+
+Do **not** use `docker compose down -v` — that deletes Postgres history.
+
+Pushes to `main` publish a new `:latest` via GitHub Actions.
+
+---
+
+## Add to an existing Compose stack
+
+Reuse your Postgres. Keep `8080` as the container port.
 
 ```yaml
   makerpulse:
-    build: ./makerpulse
+    image: ghcr.io/leon199219/makerpulse:latest
+    pull_policy: always
     restart: unless-stopped
     ports:
       - "3001:8080"
     environment:
-      DATABASE_URL: postgres://USER:PASS@YOUR_POSTGRES:5432/YOUR_DB
-      MAKERWORLD_UID: ""
+      DATABASE_URL: postgres://USER:PASSWORD@postgres:5432/DATABASE
       POLL_INTERVAL_MINUTES: "30"
     depends_on:
-      - YOUR_POSTGRES
+      - postgres
 ```
 
-If you reuse an existing Postgres, apply `migrations/0002_makerpulse.sql` once (or let the container run `node scripts/migrate.mjs` on start). You then do **not** need the bundled `db` service.
+`postgres` in `DATABASE_URL` is the **Compose service name**, not `localhost`.
+
+More detail (source build, reverse proxy, troubleshooting): [INSTALL.md](INSTALL.md).
+
+---
 
 ## Environment
 
-| Variable | Description |
-| --- | --- |
-| `DATABASE_URL` | Postgres connection string |
-| `MAKERWORLD_UID` | Numeric MakerWorld user ID |
-| `POLL_INTERVAL_MINUTES` | Poll cadence (minimum 5) |
-| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather |
-| `TELEGRAM_CHAT_ID` | Chat or group ID |
-| `TELEGRAM_CADENCE` | `hourly` \| `every_6h` \| `daily` \| `weekly` |
-| `CRON_SECRET` | Optional bearer/query secret for `GET /api/cron` |
-| `MAKERPULSE_PORT` | Host port published by Compose (default `8080`) |
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DATABASE_URL` | Yes | Postgres URL (`user:pass@service:5432/db`) |
+| `MAKERWORLD_UID` | No | Numeric MakerWorld user ID (or set in Settings) |
+| `POLL_INTERVAL_MINUTES` | No | Default `30`, minimum `5` |
+| `TELEGRAM_BOT_TOKEN` | No | From [@BotFather](https://t.me/BotFather) |
+| `TELEGRAM_CHAT_ID` | No | Chat or group ID |
+| `TELEGRAM_CADENCE` | No | `hourly` \| `every_6h` \| `daily` \| `weekly` |
+| `CRON_SECRET` | No | Protects `GET /api/cron` |
+| `MAKERPULSE_PORT` | No | Host port for the standalone compose file (default `8080`) |
 
-You can also set the creator and Telegram bot from **Settings** in the UI.
+Creator and Telegram can always be configured in **Settings**.
 
-Creator input accepts a numeric user ID or any published model URL (`https://makerworld.com/en/models/…`). Public handle lookup is not available.
-
-## HTTP API
-
-- `GET /api/health` — liveness
-- `GET /api/stats` — current totals and 24h deltas (Home Assistant / Grafana JSON)
-- `GET /api/cron` — trigger a poll (`CRON_SECRET` if set)
+---
 
 ## Telegram
 
-1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token.
-2. Message the bot, then get your chat ID (for example via `@userinfobot`).
+1. Create a bot with [@BotFather](https://t.me/BotFather).
+2. Message the bot, then get your chat ID (e.g. `@userinfobot`).
 3. Paste token + chat ID in Settings, enable updates, send a test.
 
-## Notes
+---
 
-- Points are **estimated** from public data (`prints × 2 + boosts`, +25% on exclusive models). MakerWorld does not publish the official points balance without a Creator Center session.
-- Comments and per-model boosts come from the public model list; followers, likes, collections, downloads, and boosts gained come from the public profile.
+## HTTP API
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/health` | Liveness `{ "ok": true, "service": "makerpulse" }` |
+| `GET /api/stats` | Current totals and 24h deltas (Home Assistant / Grafana) |
+| `GET /api/cron` | Trigger a poll (`CRON_SECRET` if set) |
+
+---
+
+## Settings
+
+- Connect a creator (numeric UID or `https://makerworld.com/…/models/…`)
+- Poll interval
+- Telegram bot
+- **Reset tracking data** — clears snapshots/events and takes a fresh baseline (demo data mixed with your account)
+
+---
+
+## Build from source
+
+```bash
+git clone https://github.com/leon199219/makerpulse.git
+cd makerpulse
+docker compose up -d --build
+```
+
+Or `docker build -t makerpulse:local .` and point Compose at that tag.
+
+---
+
+## License
+
+[MIT](LICENSE)
+
+MakerWorld and Bambu Lab are trademarks of their respective owners.

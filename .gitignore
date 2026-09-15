@@ -3,3 +3,16 @@ node_modules/
 .github_repo
 .env
 .env.*
+.vercel/
+artifacts/
+screenshots/*.json
+coverage/
+dist/
+*.log
+.DS_Store
+AGENTS.md
+AGENTS.project.md
+startup.sh
+.node_modules.lock
+.grok/*
+!.grok/app-env.json
