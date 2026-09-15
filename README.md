@@ -39,7 +39,7 @@ The dashboard and the CYD are independent. Run one, the other, or both.
 
 ---
 
-## Quick start
+## Quick start - MakerPulse Docker Compose 
 
 No source tree required. Use the published image.
 
