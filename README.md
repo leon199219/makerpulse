@@ -1,4 +1,4 @@
-# MakerPulse
+# MakerPulse - Docker Compose
 
 Self-hosted **MakerWorld** creator analytics. Track likes, collections, prints, downloads, comments, boosts, followers, and estimated points — per published model and as account totals. Optional Telegram summaries. English UI.
 
