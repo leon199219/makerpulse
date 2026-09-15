@@ -1,0 +1,38 @@
+# Paste the `makerpulse` service into your existing Compose file.
+# Put this project in ./makerpulse next to that file.
+#
+# depends_on MUST be a service that already exists in YOUR file.
+# The error `depends on undefined service "db"` means you copied the
+# standalone service (which expects a service named `db`) without adding it.
+#
+# Reuse your Postgres: set DATABASE_URL host + depends_on to THAT service name.
+# No Postgres yet: also paste the `db` service and volume from docker-compose.yml.
+
+services:
+  makerpulse:
+    build: ./makerpulse
+    restart: unless-stopped
+    ports:
+      - "3001:8080"
+    environment:
+      DATABASE_URL: postgres://USER:PASSWORD@postgres:5432/DATABASE
+      MAKERWORLD_UID: ""
+      POLL_INTERVAL_MINUTES: "30"
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_CHAT_ID: ""
+      TELEGRAM_CADENCE: "daily"
+      CRON_SECRET: ""
+    depends_on:
+      - postgres
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s

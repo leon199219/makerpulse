@@ -1,0 +1,53 @@
+services:
+  makerpulse:
+    build: .
+    container_name: makerpulse
+    restart: unless-stopped
+    ports:
+      # host:container — keep 8080 on the right. Change the left side if that
+      # host port is already taken, e.g. "3001:8080" or "${MAKERPULSE_PORT:-8080}:8080".
+      - "${MAKERPULSE_PORT:-8080}:8080"
+    environment:
+      DATABASE_URL: postgres://makerpulse:makerpulse@db:5432/makerpulse
+      # Numeric MakerWorld user ID (preferred) or leave empty and set it in the UI
+      MAKERWORLD_UID: ""
+      POLL_INTERVAL_MINUTES: "30"
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_CHAT_ID: ""
+      TELEGRAM_CADENCE: "daily"
+      # Optional shared secret for GET /api/cron
+      CRON_SECRET: ""
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  db:
+    image: postgres:16-alpine
+    container_name: makerpulse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: makerpulse
+      POSTGRES_PASSWORD: makerpulse
+      POSTGRES_DB: makerpulse
+    volumes:
+      - makerpulse-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U makerpulse -d makerpulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  makerpulse-data:

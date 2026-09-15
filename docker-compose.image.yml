@@ -1,0 +1,55 @@
+# Run MakerPulse from a pre-built image (no source folder, no `build:`).
+# Build once:  docker build -t makerpulse:1.0 .
+# Or pull:     docker pull ghcr.io/leon199219/makerpulse:1.0
+#
+# Keep 8080 on the right. Change the left-hand host port if needed.
+
+services:
+  makerpulse:
+    image: ${MAKERPULSE_IMAGE:-makerpulse:1.0}
+    container_name: makerpulse
+    restart: unless-stopped
+    ports:
+      - "${MAKERPULSE_PORT:-8080}:8080"
+    environment:
+      DATABASE_URL: postgres://makerpulse:makerpulse@db:5432/makerpulse
+      MAKERWORLD_UID: ""
+      POLL_INTERVAL_MINUTES: "30"
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_CHAT_ID: ""
+      TELEGRAM_CADENCE: "daily"
+      CRON_SECRET: ""
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  db:
+    image: postgres:16-alpine
+    container_name: makerpulse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: makerpulse
+      POSTGRES_PASSWORD: makerpulse
+      POSTGRES_DB: makerpulse
+    volumes:
+      - makerpulse-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U makerpulse -d makerpulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  makerpulse-data:
