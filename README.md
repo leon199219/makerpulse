@@ -1,4 +1,4 @@
-# MakerPulse - Docker Compose
+# MakerPulse
 
 Self-hosted **MakerWorld** creator analytics. Track likes, collections, prints, downloads, comments, boosts, followers, and estimated points — per published model and as account totals. Optional Telegram summaries. English UI.
 
@@ -9,8 +9,6 @@ Self-hosted **MakerWorld** creator analytics. Track likes, collections, prints, 
 **Image:** `ghcr.io/leon199219/makerpulse:latest`
 
 ![Overview](screenshots/home.png)
-<img width="2845" height="1835" alt="afbeelding" src="https://github.com/user-attachments/assets/f1d10eea-3d07-43a6-b9b0-23f647bb3cdd" />
-
 
 | Overview | Models | Activity |
 | --- | --- | --- |
@@ -29,7 +27,15 @@ Self-hosted **MakerWorld** creator analytics. Track likes, collections, prints, 
 
 Not affiliated with Bambu Lab or MakerWorld. Points are **estimated** from public stats (`prints × 2 + boosts`, +25% on exclusive models).
 
-Hardware companion: [MakerPulse-CYD](https://github.com/leon199219/MakerPulse-CYD) (ESP32 dashboard).
+---
+
+## Hardware companion
+
+Want the same stats on a desk display? **[MakerPulse-CYD](https://github.com/leon199219/MakerPulse-CYD)** runs on a Cheap Yellow Display ([ESP32-2432S028](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display)): Telegram on change, MQTT backlight for Home Assistant. No Docker on the ESP — it talks to MakerWorld itself.
+
+[![MakerPulse on the CYD](https://raw.githubusercontent.com/leon199219/MakerPulse-CYD/main/docs/cyd.png)](https://github.com/leon199219/MakerPulse-CYD)
+
+The dashboard and the CYD are independent. Run one, the other, or both.
 
 ---
 
