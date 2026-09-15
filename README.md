@@ -29,7 +29,7 @@ Not affiliated with Bambu Lab or MakerWorld. Points are **estimated** from publi
 
 ---
 
-## Hardware companion
+## (Other project) : Hardware companion
 
 Want the same stats on a desk display? **[MakerPulse-CYD](https://github.com/leon199219/MakerPulse-CYD)** runs on a Cheap Yellow Display ([ESP32-2432S028](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display)): Telegram on change, MQTT backlight for Home Assistant. No Docker on the ESP — it talks to MakerWorld itself.
 
