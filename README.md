@@ -9,6 +9,8 @@ Self-hosted **MakerWorld** creator analytics. Track likes, collections, prints, 
 **Image:** `ghcr.io/leon199219/makerpulse:latest`
 
 ![Overview](screenshots/home.png)
+<img width="2845" height="1835" alt="afbeelding" src="https://github.com/user-attachments/assets/f1d10eea-3d07-43a6-b9b0-23f647bb3cdd" />
+
 
 | Overview | Models | Activity |
 | --- | --- | --- |
