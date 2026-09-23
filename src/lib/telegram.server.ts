@@ -18,9 +18,9 @@ export type TelegramEvent = {
 
 function escapeHtml(value: string): string {
   return value
-    .replaceAll("&", "&")
-    .replaceAll("<", "<")
-    .replaceAll(">", ">");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
 export async function sendTelegramMessage(
@@ -105,17 +105,38 @@ export function formatPeriodicSummary(input: {
   totals: Record<Metric, number>;
   deltas: Record<Metric, number>;
   modelCount: number;
+  windowLabel: string;
+  modelChanges?: { title: string; changes: { metric: Metric; delta: number }[] }[];
 }): string {
-  const { creatorName, handle, totals, deltas, modelCount } = input;
+  const { creatorName, handle, totals, deltas, modelCount, windowLabel, modelChanges } = input;
   const lines = [
-    `<b>MakerPulse summary</b>`,
+    `<b>MakerPulse summary</b> · ${escapeHtml(windowLabel)}`,
     `${escapeHtml(creatorName)} <i>@${escapeHtml(handle)}</i> · ${modelCount} models`,
     "",
+    "<b>Account</b>",
   ];
-  (Object.keys(totals) as Metric[]).forEach((metric) => {
-    lines.push(
-      `• ${METRIC_LABELS[metric]}: ${formatExact(totals[metric])} (${formatDelta(deltas[metric])})`,
-    );
-  });
+  const moved = (Object.keys(totals) as Metric[]).filter((metric) => deltas[metric] !== 0);
+  if (moved.length === 0) {
+    lines.push("No account changes in this period.");
+  } else {
+    for (const metric of moved) {
+      lines.push(
+        `• ${METRIC_LABELS[metric]}: ${formatExact(totals[metric])} (${formatDelta(deltas[metric])})`,
+      );
+    }
+  }
+  if (modelChanges && modelChanges.length) {
+    lines.push("", "<b>Models</b>");
+    const cap = 12;
+    modelChanges.slice(0, cap).forEach((model) => {
+      const bits = model.changes
+        .map((change) => `${METRIC_LABELS[change.metric]} ${formatDelta(change.delta)}`)
+        .join(", ");
+      lines.push(`• ${escapeHtml(model.title)} — ${bits}`);
+    });
+    if (modelChanges.length > cap) {
+      lines.push(`• …and ${modelChanges.length - cap} more models`);
+    }
+  }
   return lines.join("\n");
 }

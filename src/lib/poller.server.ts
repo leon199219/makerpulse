@@ -5,7 +5,7 @@ import {
   resolveCreator,
   type MwSnapshot,
 } from "@/lib/makerworld.server";
-import { EMPTY_STATS, METRICS, type Metric, type StatBlock } from "@/lib/metrics";
+import { EMPTY_STATS, METRICS, MODEL_METRICS, type Metric, type StatBlock } from "@/lib/metrics";
 import {
   formatChangeDigest,
   formatPeriodicSummary,
@@ -174,11 +174,45 @@ function cadenceMs(cadence: string): number {
   }
 }
 
+function cadenceWindowLabel(cadence: string): string {
+  switch (cadence) {
+    case "hourly":
+      return "the last hour";
+    case "every_6h":
+      return "the last 6 hours";
+    case "weekly":
+      return "the last 7 days";
+    default:
+      return "the last 24 hours";
+  }
+}
+
+async function baselinesForWindow(at: Date): Promise<Map<string, SnapshotRow>> {
+  const sql = await getSql();
+  const before = await sql<SnapshotRow>`
+    select distinct on (design_id) *
+    from mp_snapshots
+    where taken_at <= ${at.toISOString()}
+    order by design_id nulls first, taken_at desc
+  `;
+  const map = new Map<string, SnapshotRow>();
+  for (const row of before) map.set(row.design_id ?? "", row);
+  const earliest = await sql<SnapshotRow>`
+    select distinct on (design_id) *
+    from mp_snapshots
+    order by design_id nulls first, taken_at asc
+  `;
+  for (const row of earliest) {
+    const key = row.design_id ?? "";
+    if (!map.has(key)) map.set(key, row);
+  }
+  return map;
+}
+
 async function maybeTelegram(
   settings: SettingsRow,
   snapshot: MwSnapshot,
   events: TelegramEvent[],
-  periodDeltas: StatBlock,
 ): Promise<void> {
   if (!settings.telegram_enabled || !settings.telegram_bot_token || !settings.telegram_chat_id) {
     return;
@@ -196,21 +230,59 @@ async function maybeTelegram(
       includeModels: settings.telegram_include_models,
     });
     await sendTelegramMessage(settings.telegram_bot_token, settings.telegram_chat_id, html);
-    await sql`update mp_settings set last_telegram_at = now() where id = 1`;
-    return;
   }
 
-  if (due) {
-    const html = formatPeriodicSummary({
-      creatorName: snapshot.profile.name,
-      handle: snapshot.profile.handle,
-      totals: snapshot.totals,
-      deltas: periodDeltas,
-      modelCount: snapshot.models.length,
-    });
-    await sendTelegramMessage(settings.telegram_bot_token, settings.telegram_chat_id, html);
-    await sql`update mp_settings set last_telegram_at = now() where id = 1`;
+  if (!due) return;
+
+  const windowStart = last
+    ? new Date(last)
+    : new Date(now - cadenceMs(settings.telegram_cadence));
+  const baselines = await baselinesForWindow(windowStart);
+  const accountBase = rowStats(baselines.get("") ?? null);
+  const deltas: StatBlock = { ...EMPTY_STATS };
+  for (const metric of METRICS) {
+    deltas[metric] = snapshot.totals[metric] - accountBase[metric];
   }
+
+  const modelChanges: { title: string; changes: { metric: Metric; delta: number }[] }[] = [];
+  if (settings.telegram_include_models) {
+    for (const model of snapshot.models) {
+      const base = baselines.get(model.designId);
+      if (!base) continue;
+      const current: StatBlock = {
+        likes: model.likes,
+        collections: model.collections,
+        prints: model.prints,
+        downloads: model.downloads,
+        comments: model.comments,
+        boosts: model.boosts,
+        followers: 0,
+        points: model.points,
+      };
+      const changes = MODEL_METRICS.map((metric) => ({
+        metric,
+        delta: current[metric] - (Number(base[metric]) || 0),
+      })).filter((change) => change.delta !== 0);
+      if (changes.length) modelChanges.push({ title: model.title, changes });
+    }
+    modelChanges.sort((a, b) => {
+      const score = (list: { delta: number }[]) =>
+        list.reduce((sum, change) => sum + Math.abs(change.delta), 0);
+      return score(b.changes) - score(a.changes);
+    });
+  }
+
+  const html = formatPeriodicSummary({
+    creatorName: snapshot.profile.name,
+    handle: snapshot.profile.handle,
+    totals: snapshot.totals,
+    deltas,
+    modelCount: snapshot.models.length,
+    windowLabel: cadenceWindowLabel(settings.telegram_cadence),
+    modelChanges,
+  });
+  await sendTelegramMessage(settings.telegram_bot_token, settings.telegram_chat_id, html);
+  await sql`update mp_settings set last_telegram_at = now() where id = 1`;
 }
 
 export async function runPoll(): Promise<{ ok: boolean; error?: string; events: number }> {
@@ -283,11 +355,7 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
       }
     }
 
-    const periodDeltas: StatBlock = { ...EMPTY_STATS };
-    for (const metric of METRICS) {
-      periodDeltas[metric] = snapshot.totals[metric] - prevAccount[metric];
-    }
-    await maybeTelegram(settings, snapshot, allEvents, periodDeltas);
+    await maybeTelegram(settings, snapshot, allEvents);
     return { ok: true, events: allEvents.length };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

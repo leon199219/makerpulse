@@ -180,6 +180,9 @@ function SettingsPage() {
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
             </select>
+            <p className="text-xs text-muted-foreground">
+              Each summary covers changes over that full period, not only the latest poll.
+            </p>
           </div>
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm">Send when stats change</p>
