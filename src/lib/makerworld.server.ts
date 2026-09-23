@@ -118,7 +118,10 @@ function mapProfile(raw: Json): MwProfile {
     followers: num(raw.fanCount),
     likes: num(raw.likeCount),
     collections: num(raw.collectionCount),
-    downloads: num(raw.downloadCount),
+    downloads:
+      "myDesignDownloadCount" in mw
+        ? num(mw.myDesignDownloadCount)
+        : num(raw.downloadCount),
     boosts: num(raw.boostGained),
     prints: num(mw.myDesignPrintCount),
     designCount: num(mw.designCount),
