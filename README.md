@@ -6,7 +6,7 @@ Self-hosted **MakerWorld** creator analytics. Track likes, collections, prints, 
 [![GHCR](https://img.shields.io/badge/GHCR-leon199219%2Fmakerpulse-blue?logo=github)](https://github.com/leon199219/makerpulse/pkgs/container/makerpulse)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Image:** `ghcr.io/leon199219/makerpulse:latest`
+**Image:** `ghcr.io/leon199219/makerpulse:latest` · [Changelog](CHANGELOG.md)
 
 ![Overview](screenshots/home.png)
 
