@@ -98,7 +98,7 @@ function Home() {
                 </p>
               </div>
             </div>
-            <div className="flex flex-col gap-2 sm:items-end">
+            <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:items-end">
               <PeriodPicker value={period} onChange={setPeriod} />
               <Button
                 variant="secondary"

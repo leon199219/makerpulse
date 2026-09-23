@@ -9,6 +9,7 @@ Image: `ghcr.io/leon199219/makerpulse:latest`
 ### Fixed
 
 - Account **Downloads** now uses MakerWorld’s model-download total (`myDesignDownloadCount`), the same figure as the public profile. The previous value was `downloadCount`, which also folds in print-profile downloads and prints.
+- Telegram summary cadence is a visible **1h / 6h / 24h / 7d** control again. Period buttons on Overview, Models, and Activity no longer collapse off-screen.
 - Telegram **summary cadence** now reports changes over the full window, not only since the last poll.
   - Hourly: the last hour
   - Every 6 hours: the last 6 hours

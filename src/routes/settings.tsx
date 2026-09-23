@@ -168,20 +168,38 @@ function SettingsPage() {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="cadence">Summary cadence</Label>
-            <select
-              id="cadence"
-              value={cadence}
-              onChange={(e) => setCadence(e.target.value)}
-              className="h-11 rounded-md border border-input bg-secondary px-3 text-sm"
+            <Label id="cadence-label">Summary cadence</Label>
+            <div
+              role="radiogroup"
+              aria-labelledby="cadence-label"
+              className="flex w-full flex-wrap gap-1 rounded-lg bg-secondary p-1"
             >
-              <option value="hourly">Hourly</option>
-              <option value="every_6h">Every 6 hours</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-            </select>
+              {(
+                [
+                  ["hourly", "1h"],
+                  ["every_6h", "6h"],
+                  ["daily", "24h"],
+                  ["weekly", "7d"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={cadence === value}
+                  onClick={() => setCadence(value)}
+                  className={`inline-flex h-11 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium ${
+                    cadence === value
+                      ? "bg-background text-foreground shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Each summary covers changes over that full period, not only the latest poll.
+              Each summary covers changes over that full period: 1 hour, 6 hours, 24 hours, or 7 days.
             </p>
           </div>
           <div className="flex items-center justify-between gap-3">
