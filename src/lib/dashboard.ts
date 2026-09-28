@@ -156,7 +156,8 @@ export const loadDashboard = createServerFn({ method: "POST" })
       cover_url: string;
       is_exclusive: boolean | string;
       published_at: string | null;
-    }>`select design_id, title, slug, cover_url, is_exclusive, published_at from mp_models`;
+      removed_at: string | null;
+    }>`select design_id, title, slug, cover_url, is_exclusive, published_at, removed_at from mp_models`;
 
     const latestModel = await sql<{ design_id: string } & StatBlock>`
       select distinct on (design_id) design_id, likes, collections, prints, downloads, comments, boosts, followers, points
@@ -183,21 +184,27 @@ export const loadDashboard = createServerFn({ method: "POST" })
     const firstMap = new Map(firstModel.map((r) => [r.design_id, toStats(r)]));
     const baseMap = new Map(baseModel.map((r) => [r.design_id, toStats(r)]));
 
-    const models: ModelRow[] = modelMeta.map((meta) => {
+    const published: ModelRow[] = [];
+    const removed: ModelRow[] = [];
+    for (const meta of modelMeta) {
       const stats = latestMap.get(meta.design_id) ?? { ...EMPTY_STATS };
       const modelBaseline = baseMap.get(meta.design_id) ?? firstMap.get(meta.design_id) ?? { ...EMPTY_STATS };
-      return {
+      const row: ModelRow = {
         designId: meta.design_id,
         title: meta.title,
         slug: meta.slug,
         coverUrl: meta.cover_url,
         exclusive: meta.is_exclusive === true || meta.is_exclusive === "t",
         publishedAt: asIso(meta.published_at),
+        removedAt: asIso(meta.removed_at),
         stats,
         deltas: subtract(stats, modelBaseline),
       };
-    });
-    models.sort((a, b) => b.stats.downloads - a.stats.downloads);
+      if (row.removedAt) removed.push(row);
+      else published.push(row);
+    }
+    published.sort((a, b) => b.stats.downloads - a.stats.downloads);
+    removed.sort((a, b) => (b.removedAt ?? "").localeCompare(a.removedAt ?? ""));
 
     const eventRows = startIso
       ? await sql<{
@@ -250,9 +257,10 @@ export const loadDashboard = createServerFn({ method: "POST" })
       current,
       deltas,
       series,
-      models,
+      models: published,
+      removedModels: removed,
       events,
-      modelCount: models.length,
+      modelCount: published.length,
     };
   });
 

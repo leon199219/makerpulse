@@ -4,6 +4,13 @@ User-facing changes to MakerPulse. Newest first.
 
 Image: `ghcr.io/leon199219/makerpulse:latest`
 
+## 2026-09-28
+
+### Fixed
+
+- Comment totals use the model-page count. The published-models list under-reports comments (for example 23 instead of 143 on “Shower Head Extension+Angle Adjustment= Rainfall”).
+- Models deleted on MakerWorld leave the overview and move to **Removed from MakerWorld** on the Models page, with their last recorded stats.
+
 ## 2026-09-23
 
 ### Fixed

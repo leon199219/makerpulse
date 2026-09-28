@@ -177,6 +177,29 @@ export async function fetchPublishedModels(uid: string): Promise<MwModel[]> {
   return models;
 }
 
+/** The published-designs list under-reports commentCount. The model page does not. */
+async function withExactComments(models: MwModel[]): Promise<MwModel[]> {
+  const out = models.slice();
+  let cursor = 0;
+  const workers = Math.min(4, out.length);
+  async function next(): Promise<void> {
+    while (cursor < out.length) {
+      const index = cursor;
+      cursor += 1;
+      const model = out[index];
+      if (!model) return;
+      try {
+        const raw = (await fetchDesign(model.designId)) as Json;
+        if ("commentCount" in raw) out[index] = { ...model, comments: num(raw.commentCount) };
+      } catch {
+        // Keep the list count when the model page is briefly unavailable.
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: workers }, () => next()));
+  return out;
+}
+
 export async function resolveCreator(input: string): Promise<{ uid: string; handle: string }> {
   const parsed = parseCreatorInput(input);
   if (parsed.kind === "uid") {
@@ -197,10 +220,11 @@ export async function resolveCreator(input: string): Promise<{ uid: string; hand
 }
 
 export async function collectSnapshot(uid: string): Promise<MwSnapshot> {
-  const [profile, models] = await Promise.all([
+  const [profile, listed] = await Promise.all([
     fetchProfile(uid),
     fetchPublishedModels(uid),
   ]);
+  const models = await withExactComments(listed);
   const comments = models.reduce((sum, m) => sum + m.comments, 0);
   const modelPrints = models.reduce((sum, m) => sum + m.prints, 0);
   const modelBoosts = models.reduce((sum, m) => sum + m.boosts, 0);

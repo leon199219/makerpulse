@@ -328,7 +328,8 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
           slug = excluded.slug,
           cover_url = excluded.cover_url,
           is_exclusive = excluded.is_exclusive,
-          last_seen_at = now()
+          last_seen_at = now(),
+          removed_at = null
       `;
       const stats: StatBlock = {
         likes: model.likes,
@@ -352,6 +353,17 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
       );
       for (const event of modelEvents) {
         allEvents.push({ ...event, designTitle: model.title });
+      }
+    }
+
+    const liveIds = new Set(snapshot.models.map((model) => model.designId));
+    if (liveIds.size > 0 || snapshot.profile.designCount === 0) {
+      const stored = await sql<{ design_id: string }>`
+        select design_id from mp_models where removed_at is null
+      `;
+      for (const row of stored) {
+        if (liveIds.has(row.design_id)) continue;
+        await sql`update mp_models set removed_at = now() where design_id = ${row.design_id}`;
       }
     }
 

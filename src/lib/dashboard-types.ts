@@ -9,6 +9,7 @@ export type ModelRow = {
   coverUrl: string;
   exclusive: boolean;
   publishedAt: string | null;
+  removedAt: string | null;
   stats: StatBlock;
   deltas: StatBlock;
 };
@@ -47,6 +48,7 @@ export type DashboardPayload = {
   deltas: StatBlock;
   series: Record<Metric, SeriesPoint[]>;
   models: ModelRow[];
+  removedModels: ModelRow[];
   events: EventRow[];
   modelCount: number;
 };
