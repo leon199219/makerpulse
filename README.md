@@ -137,10 +137,10 @@ More detail (source build, reverse proxy, troubleshooting): [INSTALL.md](INSTALL
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Postgres URL (`user:pass@service:5432/db`) |
 | `MAKERWORLD_UID` | No | Numeric MakerWorld user ID (or set in Settings) |
-| `POLL_INTERVAL_MINUTES` | No | Default `30`, minimum `5` |
+| `POLL_INTERVAL_MINUTES` | No | Starting value only (`30`). After you save Settings, the app uses that interval |
 | `TELEGRAM_BOT_TOKEN` | No | From [@BotFather](https://t.me/BotFather) |
 | `TELEGRAM_CHAT_ID` | No | Chat or group ID |
-| `TELEGRAM_CADENCE` | No | `hourly` \| `every_6h` \| `daily` \| `weekly` |
+| `TELEGRAM_CADENCE` | No | Starting value only: `hourly`, `every_6h`, `daily`, or `weekly`. After you save Settings, that choice is used |
 | `CRON_SECRET` | No | Protects `GET /api/cron` |
 | `MAKERPULSE_PORT` | No | Host port for the standalone compose file (default `8080`) |
 

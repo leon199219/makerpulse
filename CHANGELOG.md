@@ -4,6 +4,12 @@ User-facing changes to MakerPulse. Newest first.
 
 Image: `ghcr.io/leon199219/makerpulse:latest`
 
+## 2026-10-01
+
+### Fixed
+
+- Settings for **poll interval** and **Telegram summary cadence** stay saved. Compose defaults (`30` minutes and `daily`) were written back over the database on every page load.
+
 ## 2026-09-28
 
 ### Fixed

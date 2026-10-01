@@ -360,6 +360,7 @@ export const saveSettings = createServerFn({ method: "POST" })
         telegram_cadence = ${data.telegramCadence},
         telegram_on_change = ${data.telegramOnChange},
         telegram_include_models = ${data.telegramIncludeModels},
+        preferences_saved = true,
         updated_at = now()
       where id = 1
     `;

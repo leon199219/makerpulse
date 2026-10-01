@@ -63,6 +63,10 @@ export async function getSettings(): Promise<SettingsRow> {
 
 export async function applyEnvOverrides(): Promise<void> {
   const sql = await getSql();
+  const savedRows = await sql<{ preferences_saved: boolean | string | number }>`
+    select preferences_saved from mp_settings where id = 1
+  `;
+  const preferencesSaved = asBool(savedRows[0]?.preferences_saved);
   const uid = env("MAKERWORLD_UID");
   const handle = env("MAKERWORLD_HANDLE");
   const interval = env("POLL_INTERVAL_MINUTES");
@@ -75,7 +79,8 @@ export async function applyEnvOverrides(): Promise<void> {
   if (handle) {
     await sql`update mp_settings set creator_handle = ${handle}, updated_at = now() where id = 1`;
   }
-  if (interval && Number(interval) > 0) {
+  // Compose defaults (30 min, daily) must not wipe values saved in Settings.
+  if (!preferencesSaved && interval && Number(interval) > 0) {
     await sql`update mp_settings set poll_interval_minutes = ${Number(interval)}, updated_at = now() where id = 1`;
   }
   if (token) {
@@ -84,7 +89,7 @@ export async function applyEnvOverrides(): Promise<void> {
   if (chat) {
     await sql`update mp_settings set telegram_chat_id = ${chat}, updated_at = now() where id = 1`;
   }
-  if (cadence) {
+  if (!preferencesSaved && cadence) {
     await sql`update mp_settings set telegram_cadence = ${cadence}, updated_at = now() where id = 1`;
   }
 }
