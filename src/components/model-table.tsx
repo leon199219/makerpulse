@@ -1,8 +1,7 @@
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Heart } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { METRIC_LABELS, MODEL_METRICS, type Metric } from "@/lib/metrics";
 import { cn, formatDelta, formatExact } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import type { ModelRow } from "@/lib/dashboard-types";
 
 export type ModelSortKey = "published" | Metric;
@@ -50,97 +49,87 @@ export function ModelTable({
   }
 
   return (
-    <div className="w-full min-w-0 max-w-full overflow-x-auto">
-      <table className="w-full min-w-[720px] text-left text-sm">
-        <thead>
-          <tr className="border-b border-border text-xs text-muted-foreground">
-            <th className="py-3 pr-3 font-medium">Model</th>
-            {MODEL_METRICS.map((metric) => {
-              const active = sortKey === metric;
-              const label = METRIC_LABELS[metric];
-              if (!onSort) {
-                return (
-                  <th key={metric} className="px-2 py-3 font-medium">
-                    {label}
-                  </th>
-                );
-              }
-              return (
-                <th key={metric} className="px-1 py-1 font-medium">
-                  <button
-                    type="button"
-                    onClick={() => onSort(metric)}
-                    className={cn(
-                      "inline-flex h-11 items-center gap-1 rounded-md px-1 text-xs font-medium hover:text-foreground",
-                      active ? "text-foreground" : "text-muted-foreground",
-                    )}
-                    aria-label={`Sort by ${label}`}
-                  >
-                    {label}
-                    {active ? (
-                      sortDir === "asc" ? (
-                        <ArrowUp className="size-3.5" />
-                      ) : (
-                        <ArrowDown className="size-3.5" />
-                      )
-                    ) : (
-                      <ArrowUpDown className="size-3.5 opacity-50" />
-                    )}
-                  </button>
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {models.map((model) => (
-            <tr key={model.designId} className="border-b border-border/70 last:border-0">
-              <td className="py-3 pr-3">
-                <Link
-                  to="/models/$designId"
-                  params={{ designId: model.designId }}
-                  className="flex items-center gap-3 hover:text-primary"
-                >
-                  {model.coverUrl ? (
-                    <img
-                      src={model.coverUrl}
-                      alt=""
-                      className="size-10 rounded-md object-cover outline outline-1 -outline-offset-1 outline-white/10"
-                    />
+    <div className="flex flex-col gap-4">
+      {onSort ? (
+        <div className="flex flex-wrap gap-2">
+          {MODEL_METRICS.map((metric) => {
+            const active = sortKey === metric;
+            return (
+              <button
+                key={metric}
+                type="button"
+                onClick={() => onSort(metric)}
+                className={cn(
+                  "inline-flex h-9 items-center gap-1 rounded-full px-3.5 text-xs font-medium transition-colors",
+                  active ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
+                )}
+                aria-label={`Sort by ${METRIC_LABELS[metric]}`}
+              >
+                {METRIC_LABELS[metric]}
+                {active ? (
+                  sortDir === "asc" ? (
+                    <ArrowUp className="size-3.5" />
                   ) : (
-                    <span className="size-10 rounded-md bg-secondary" />
-                  )}
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{model.title}</span>
-                    <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                      {model.exclusive ? <Badge tone="accent">Exclusive</Badge> : null}
-                    </span>
+                    <ArrowDown className="size-3.5" />
+                  )
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+        {models.map((model) => {
+          const focus = sortKey && sortKey !== "published" ? sortKey : "downloads";
+          const delta = model.deltas[focus];
+          return (
+            <Link
+              key={model.designId}
+              to="/models/$designId"
+              params={{ designId: model.designId }}
+              className="group min-w-0"
+            >
+              <div className="relative overflow-hidden rounded-xl bg-secondary">
+                {model.coverUrl ? (
+                  <img
+                    src={model.coverUrl}
+                    alt=""
+                    className="aspect-[4/3] w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                  />
+                ) : (
+                  <div className="aspect-[4/3] w-full bg-secondary" />
+                )}
+                {model.exclusive ? (
+                  <span className="absolute left-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                    Exclusive
                   </span>
-                </Link>
-              </td>
-              {MODEL_METRICS.map((metric) => {
-                const delta = model.deltas[metric];
-                return (
-                  <td key={metric} className="px-2 py-3 align-top">
-                    <div className="font-mono tabular-nums">{formatExact(model.stats[metric])}</div>
-                    <div
-                      className={
-                        delta > 0
-                          ? "text-xs text-success"
-                          : delta < 0
-                            ? "text-xs text-destructive"
-                            : "text-xs text-muted-foreground"
-                      }
-                    >
-                      {formatDelta(delta)}
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                ) : null}
+              </div>
+              <p className="mt-2 truncate text-sm font-medium text-foreground group-hover:text-primary">
+                {model.title}
+              </p>
+              <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1 tabular-nums">
+                  <Download className="size-3.5" />
+                  {formatExact(model.stats.downloads)}
+                </span>
+                <span className="inline-flex items-center gap-1 tabular-nums">
+                  <Heart className="size-3.5" />
+                  {formatExact(model.stats.likes)}
+                </span>
+                <span
+                  className={cn(
+                    "ml-auto tabular-nums",
+                    delta > 0 ? "text-success" : delta < 0 ? "text-destructive" : "text-muted-foreground",
+                  )}
+                >
+                  {formatDelta(delta)}
+                </span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

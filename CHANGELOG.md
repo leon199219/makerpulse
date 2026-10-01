@@ -6,6 +6,10 @@ Image: `ghcr.io/leon199219/makerpulse:latest`
 
 ## 2026-10-01
 
+### Changed
+
+- Interface closer to MakerWorld: dark canvas, green actions, pill navigation, and model cards with cover, downloads, and likes.
+
 ### Fixed
 
 - Settings for **poll interval** and **Telegram summary cadence** stay saved. Compose defaults (`30` minutes and `daily`) were written back over the database on every page load.

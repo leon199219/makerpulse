@@ -101,7 +101,6 @@ function Home() {
             <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:items-end">
               <PeriodPicker value={period} onChange={setPeriod} />
               <Button
-                variant="secondary"
                 size="sm"
                 onClick={() => sync.mutate()}
                 disabled={sync.isPending}

@@ -69,15 +69,15 @@ function ModelsPage() {
           aria-label="Filter models"
           className="sm:max-w-sm"
         />
-        <div className="flex rounded-lg bg-secondary p-1">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={() => sortByPublished("desc")}
             className={cn(
-              "inline-flex h-11 flex-1 items-center justify-center rounded-md px-3 text-xs font-medium sm:flex-none",
+              "inline-flex h-9 items-center justify-center rounded-full px-3.5 text-xs font-medium",
               sortKey === "published" && sortDir === "desc"
-                ? "bg-background text-foreground shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-foreground text-background"
+                : "bg-secondary text-foreground/85 hover:bg-accent",
             )}
           >
             Newest first
@@ -86,10 +86,10 @@ function ModelsPage() {
             type="button"
             onClick={() => sortByPublished("asc")}
             className={cn(
-              "inline-flex h-11 flex-1 items-center justify-center rounded-md px-3 text-xs font-medium sm:flex-none",
+              "inline-flex h-9 items-center justify-center rounded-full px-3.5 text-xs font-medium",
               sortKey === "published" && sortDir === "asc"
-                ? "bg-background text-foreground shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-foreground text-background"
+                : "bg-secondary text-foreground/85 hover:bg-accent",
             )}
           >
             Oldest first

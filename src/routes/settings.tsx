@@ -172,7 +172,7 @@ function SettingsPage() {
             <div
               role="radiogroup"
               aria-labelledby="cadence-label"
-              className="flex w-full flex-wrap gap-1 rounded-lg bg-secondary p-1"
+              className="flex w-full flex-wrap gap-2"
             >
               {(
                 [
@@ -188,10 +188,10 @@ function SettingsPage() {
                   role="radio"
                   aria-checked={cadence === value}
                   onClick={() => setCadence(value)}
-                  className={`inline-flex h-11 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium ${
+                  className={`inline-flex h-9 shrink-0 items-center justify-center rounded-full px-3.5 text-xs font-medium ${
                     cadence === value
-                      ? "bg-background text-foreground shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-foreground text-background"
+                      : "bg-secondary text-foreground/85 hover:bg-accent"
                   }`}
                 >
                   {label}

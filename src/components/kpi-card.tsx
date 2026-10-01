@@ -23,7 +23,7 @@ export function KpiCard({
       <Card
         className={cn(
           "transition-[box-shadow] duration-150",
-          active && "shadow-[0_0_0_1px_var(--color-primary)]",
+          active && "ring-2 ring-primary",
         )}
       >
         <CardContent className="flex flex-col gap-3 p-4 sm:p-5">
@@ -31,7 +31,7 @@ export function KpiCard({
             <p className="text-xs font-medium text-muted-foreground">{METRIC_LABELS[metric]}</p>
             <Badge tone={tone}>{formatDelta(delta)}</Badge>
           </div>
-          <p className="font-mono text-2xl font-medium tabular-nums tracking-tight sm:text-3xl">
+          <p className="text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl">
             {formatExact(value)}
           </p>
         </CardContent>
