@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { KpiCard } from "@/components/kpi-card";
+import { KpiCard, RatingCard } from "@/components/kpi-card";
 import { PeriodPicker } from "@/components/period-picker";
 import { StatsChart } from "@/components/stats-chart";
 import { Badge } from "@/components/ui/badge";
@@ -58,12 +58,19 @@ function ModelDetail() {
             <PeriodPicker value={period} onChange={setPeriod} />
           </div>
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <RatingCard
+              count={model.rating.count}
+              scoreTotal={model.rating.scoreTotal}
+              delta={model.ratingDelta}
+              previous={model.previousRatingDelta}
+            />
             {MODEL_METRICS.map((key) => (
               <KpiCard
                 key={key}
                 metric={key}
                 value={model.current[key]}
                 delta={model.deltas[key]}
+                previous={model.previous ? model.previous[key] : null}
                 active={metric === key}
                 onClick={() => setMetric(key)}
               />

@@ -1,7 +1,7 @@
-import { ArrowDown, ArrowUp, Download, Heart } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Heart, Star } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { METRIC_LABELS, MODEL_METRICS, type Metric } from "@/lib/metrics";
-import { cn, formatDelta, formatExact } from "@/lib/utils";
+import { cn, formatDelta, formatExact, formatStars } from "@/lib/utils";
 import type { ModelRow } from "@/lib/dashboard-types";
 
 export type ModelSortKey = "published" | Metric;
@@ -116,6 +116,10 @@ export function ModelTable({
                 <span className="inline-flex items-center gap-1 tabular-nums">
                   <Heart className="size-3.5" />
                   {formatExact(model.stats.likes)}
+                </span>
+                <span className="inline-flex items-center gap-1 tabular-nums">
+                  <Star className="size-3.5" />
+                  {formatStars(model.rating.count, model.rating.scoreTotal)}
                 </span>
                 <span
                   className={cn(

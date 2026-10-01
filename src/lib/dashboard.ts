@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { EMPTY_STATS, METRICS, PERIOD_KEYS, periodStart, type Metric, type PeriodKey, type StatBlock } from "@/lib/metrics";
+import { EMPTY_RATING, EMPTY_STATS, METRICS, PERIOD_KEYS, periodStart, previousPeriodStart, type Metric, type PeriodKey, type RatingBlock, type StatBlock } from "@/lib/metrics";
 import { asIso } from "@/lib/utils";
 import type {
   DashboardPayload,
@@ -76,6 +76,14 @@ function subtract(a: StatBlock, b: StatBlock): StatBlock {
   return out;
 }
 
+function ratingOf(row: { rating_count?: number | string; rating_score_total?: number | string } | undefined): RatingBlock {
+  if (!row) return { ...EMPTY_RATING };
+  return {
+    count: Number(row.rating_count) || 0,
+    scoreTotal: Number(row.rating_score_total) || 0,
+  };
+}
+
 function takenIso(value: string | Date): string {
   return asIso(value) ?? new Date().toISOString();
 }
@@ -126,6 +134,26 @@ export const loadDashboard = createServerFn({ method: "POST" })
     const baselineRow = firstOrBase[0] ?? firstEver[0];
     const baseline = baselineRow ? toStats(baselineRow as never) : { ...EMPTY_STATS };
     const deltas = subtract(current, baseline);
+    const rating = ratingOf(currentRows[0] as { rating_count?: number; rating_score_total?: number });
+    const ratingDelta = rating.count - ratingOf(baselineRow as { rating_count?: number; rating_score_total?: number }).count;
+    const prevStart = previousPeriodStart(data.period as PeriodKey);
+    const prevRows = prevStart
+      ? await sql`
+          select * from mp_snapshots
+          where design_id is null and taken_at <= ${prevStart.toISOString()}
+          order by taken_at desc
+          limit 1
+        `
+      : [];
+    const previous =
+      firstOrBase[0] && prevRows[0]
+        ? subtract(toStats(firstOrBase[0] as never), toStats(prevRows[0] as never))
+        : null;
+    const previousRatingDelta =
+      firstOrBase[0] && prevRows[0]
+        ? ratingOf(firstOrBase[0] as { rating_count?: number }).count -
+          ratingOf(prevRows[0] as { rating_count?: number }).count
+        : null;
 
     const seriesRows = startIso
       ? await sql<{ taken_at: string } & StatBlock>`
@@ -159,21 +187,24 @@ export const loadDashboard = createServerFn({ method: "POST" })
       removed_at: string | null;
     }>`select design_id, title, slug, cover_url, is_exclusive, published_at, removed_at from mp_models`;
 
-    const latestModel = await sql<{ design_id: string } & StatBlock>`
-      select distinct on (design_id) design_id, likes, collections, prints, downloads, comments, boosts, followers, points
+    const latestModel = await sql<{ design_id: string } & StatBlock & { count: number | string; score_total: number | string }>`
+      select distinct on (design_id) design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+        rating_count as count, rating_score_total as score_total
       from mp_snapshots
       where design_id is not null
       order by design_id, taken_at desc
     `;
-    const firstModel = await sql<{ design_id: string } & StatBlock>`
-      select distinct on (design_id) design_id, likes, collections, prints, downloads, comments, boosts, followers, points
+    const firstModel = await sql<{ design_id: string } & StatBlock & { count: number | string; score_total: number | string }>`
+      select distinct on (design_id) design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+        rating_count as count, rating_score_total as score_total
       from mp_snapshots
       where design_id is not null
       order by design_id, taken_at asc
     `;
     const baseModel = startIso
-      ? await sql<{ design_id: string } & StatBlock>`
-          select distinct on (design_id) design_id, likes, collections, prints, downloads, comments, boosts, followers, points
+      ? await sql<{ design_id: string } & StatBlock & { count: number | string; score_total: number | string }>`
+          select distinct on (design_id) design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+            rating_count as count, rating_score_total as score_total
           from mp_snapshots
           where design_id is not null and taken_at <= ${startIso}
           order by design_id, taken_at desc
@@ -183,12 +214,17 @@ export const loadDashboard = createServerFn({ method: "POST" })
     const latestMap = new Map(latestModel.map((r) => [r.design_id, toStats(r)]));
     const firstMap = new Map(firstModel.map((r) => [r.design_id, toStats(r)]));
     const baseMap = new Map(baseModel.map((r) => [r.design_id, toStats(r)]));
+    const latestRating = new Map(latestModel.map((r) => [r.design_id, { count: Number(r.count) || 0, scoreTotal: Number(r.score_total) || 0 }]));
+    const firstRating = new Map(firstModel.map((r) => [r.design_id, { count: Number(r.count) || 0, scoreTotal: Number(r.score_total) || 0 }]));
+    const baseRating = new Map(baseModel.map((r) => [r.design_id, { count: Number(r.count) || 0, scoreTotal: Number(r.score_total) || 0 }]));
 
     const published: ModelRow[] = [];
     const removed: ModelRow[] = [];
     for (const meta of modelMeta) {
       const stats = latestMap.get(meta.design_id) ?? { ...EMPTY_STATS };
       const modelBaseline = baseMap.get(meta.design_id) ?? firstMap.get(meta.design_id) ?? { ...EMPTY_STATS };
+      const modelRating = latestRating.get(meta.design_id) ?? { ...EMPTY_RATING };
+      const ratingBaseline = baseRating.get(meta.design_id) ?? firstRating.get(meta.design_id) ?? { ...EMPTY_RATING };
       const row: ModelRow = {
         designId: meta.design_id,
         title: meta.title,
@@ -199,6 +235,8 @@ export const loadDashboard = createServerFn({ method: "POST" })
         removedAt: asIso(meta.removed_at),
         stats,
         deltas: subtract(stats, modelBaseline),
+        rating: modelRating,
+        ratingDelta: modelRating.count - ratingBaseline.count,
       };
       if (row.removedAt) removed.push(row);
       else published.push(row);
@@ -256,6 +294,10 @@ export const loadDashboard = createServerFn({ method: "POST" })
       settings,
       current,
       deltas,
+      previous,
+      rating,
+      ratingDelta,
+      previousRatingDelta,
       series,
       models: published,
       removedModels: removed,
@@ -285,13 +327,15 @@ export const loadModel = createServerFn({ method: "POST" })
     const startIso = start?.toISOString();
     const seriesRows = startIso
       ? await sql<{ taken_at: string } & StatBlock>`
-          select taken_at, likes, collections, prints, downloads, comments, boosts, followers, points
+          select taken_at, likes, collections, prints, downloads, comments, boosts, followers, points,
+                 rating_count, rating_score_total
           from mp_snapshots
           where design_id = ${data.designId} and taken_at >= ${startIso}
           order by taken_at asc
         `
       : await sql<{ taken_at: string } & StatBlock>`
-          select taken_at, likes, collections, prints, downloads, comments, boosts, followers, points
+          select taken_at, likes, collections, prints, downloads, comments, boosts, followers, points,
+                 rating_count, rating_score_total
           from mp_snapshots
           where design_id = ${data.designId}
           order by taken_at asc
@@ -306,7 +350,37 @@ export const loadModel = createServerFn({ method: "POST" })
     const latest = seriesRows[seriesRows.length - 1];
     const first = seriesRows[0];
     const current = latest ? toStats(latest) : { ...EMPTY_STATS };
-    const baseline = first ? toStats(first) : { ...EMPTY_STATS };
+    const boundary = startIso
+      ? await sql`
+          select * from mp_snapshots
+          where design_id = ${data.designId} and taken_at <= ${startIso}
+          order by taken_at desc
+          limit 1
+        `
+      : [];
+    const baselineRow = boundary[0] ?? first;
+    const baseline = baselineRow ? toStats(baselineRow as never) : { ...EMPTY_STATS };
+    const prevStart = previousPeriodStart(data.period);
+    const prevRows = prevStart
+      ? await sql`
+          select * from mp_snapshots
+          where design_id = ${data.designId} and taken_at <= ${prevStart.toISOString()}
+          order by taken_at desc
+          limit 1
+        `
+      : [];
+    const previous =
+      boundary[0] && prevRows[0]
+        ? subtract(toStats(boundary[0] as never), toStats(prevRows[0] as never))
+        : null;
+    const rating = ratingOf(latest as { rating_count?: number; rating_score_total?: number });
+    const ratingDelta =
+      rating.count - ratingOf(baselineRow as { rating_count?: number; rating_score_total?: number }).count;
+    const previousRatingDelta =
+      boundary[0] && prevRows[0]
+        ? ratingOf(boundary[0] as { rating_count?: number }).count -
+          ratingOf(prevRows[0] as { rating_count?: number }).count
+        : null;
     return {
       designId: meta[0].design_id,
       title: meta[0].title,
@@ -315,6 +389,10 @@ export const loadModel = createServerFn({ method: "POST" })
       exclusive: meta[0].is_exclusive === true || meta[0].is_exclusive === "t",
       current,
       deltas: subtract(current, baseline),
+      previous,
+      rating,
+      ratingDelta,
+      previousRatingDelta,
       series,
     };
   });
@@ -403,15 +481,17 @@ export const exportCsv = createServerFn({ method: "POST" }).handler(async () => 
     boosts: number;
     followers: number;
     points: number;
+    rating_count: number;
+    rating_score_total: number;
   }>`
     select s.taken_at, s.design_id, m.title, s.likes, s.collections, s.prints, s.downloads,
-           s.comments, s.boosts, s.followers, s.points
+           s.comments, s.boosts, s.followers, s.points, s.rating_count, s.rating_score_total
     from mp_snapshots s
     left join mp_models m on m.design_id = s.design_id
     order by s.taken_at asc
   `;
   const header =
-    "taken_at,scope,design_id,title,likes,collections,prints,downloads,comments,boosts,followers,points";
+    "taken_at,scope,design_id,title,likes,collections,prints,downloads,comments,boosts,followers,points,rating_count,rating_score_total";
   const lines = rows.map((row) => {
     const title = (row.title ?? "Account").replaceAll('"', '""');
     return [
@@ -427,6 +507,8 @@ export const exportCsv = createServerFn({ method: "POST" }).handler(async () => 
       row.boosts,
       row.followers,
       row.points,
+      row.rating_count,
+      row.rating_score_total,
     ].join(",");
   });
   return { csv: [header, ...lines].join("\n") };

@@ -140,3 +140,28 @@ export function formatPeriodicSummary(input: {
   }
   return lines.join("\n");
 }
+
+export type MilestoneHit = {
+  title: string;
+  metric: "downloads" | "boosts";
+  threshold: number;
+  value: number;
+};
+
+export function formatMilestones(input: {
+  creatorName: string;
+  handle: string;
+  hits: MilestoneHit[];
+}): string {
+  const lines = [
+    `<b>MakerPulse milestone</b>`,
+    `${escapeHtml(input.creatorName)} <i>@${escapeHtml(input.handle)}</i>`,
+    "",
+  ];
+  for (const hit of input.hits) {
+    lines.push(
+      `• ${escapeHtml(hit.title)} reached ${formatExact(hit.threshold)} ${METRIC_LABELS[hit.metric]} (now ${formatExact(hit.value)})`,
+    );
+  }
+  return lines.join("\n");
+}

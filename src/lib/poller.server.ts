@@ -5,11 +5,13 @@ import {
   resolveCreator,
   type MwSnapshot,
 } from "@/lib/makerworld.server";
-import { EMPTY_STATS, METRICS, MODEL_METRICS, type Metric, type StatBlock } from "@/lib/metrics";
+import { EMPTY_STATS, METRICS, MILESTONE_STEPS, MODEL_METRICS, type Metric, type RatingBlock, type StatBlock } from "@/lib/metrics";
 import {
   formatChangeDigest,
+  formatMilestones,
   formatPeriodicSummary,
   sendTelegramMessage,
+  type MilestoneHit,
   type TelegramEvent,
 } from "@/lib/telegram.server";
 
@@ -128,16 +130,49 @@ function rowStats(row: SnapshotRow | null): StatBlock {
   };
 }
 
-async function insertSnapshot(designId: string | null, stats: StatBlock): Promise<void> {
+async function insertSnapshot(
+  designId: string | null,
+  stats: StatBlock,
+  rating: RatingBlock,
+): Promise<void> {
   const sql = await getSql();
   await sql`
     insert into mp_snapshots (
-      design_id, likes, collections, prints, downloads, comments, boosts, followers, points
+      design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+      rating_count, rating_score_total
     ) values (
       ${designId}, ${stats.likes}, ${stats.collections}, ${stats.prints}, ${stats.downloads},
-      ${stats.comments}, ${stats.boosts}, ${stats.followers}, ${stats.points}
+      ${stats.comments}, ${stats.boosts}, ${stats.followers}, ${stats.points},
+      ${rating.count}, ${rating.scoreTotal}
     )
   `;
+}
+
+async function claimMilestones(
+  designId: string,
+  title: string,
+  previous: StatBlock | null,
+  next: StatBlock,
+): Promise<MilestoneHit[]> {
+  const sql = await getSql();
+  const hits: MilestoneHit[] = [];
+  for (const metric of ["downloads", "boosts"] as const) {
+    for (const threshold of MILESTONE_STEPS) {
+      if (next[metric] < threshold) continue;
+      const crossed = previous != null && previous[metric] < threshold;
+      if (previous != null && !crossed) continue;
+      const inserted = await sql<{ id: number }>`
+        insert into mp_milestones (design_id, metric, threshold, value)
+        values (${designId}, ${metric}, ${threshold}, ${next[metric]})
+        on conflict (design_id, metric, threshold) do nothing
+        returning id
+      `;
+      if (crossed && inserted.length) {
+        hits.push({ title, metric, threshold, value: next[metric] });
+      }
+    }
+  }
+  return hits;
 }
 
 async function recordEvents(
@@ -218,6 +253,7 @@ async function maybeTelegram(
   settings: SettingsRow,
   snapshot: MwSnapshot,
   events: TelegramEvent[],
+  milestones: MilestoneHit[],
 ): Promise<void> {
   if (!settings.telegram_enabled || !settings.telegram_bot_token || !settings.telegram_chat_id) {
     return;
@@ -226,6 +262,21 @@ async function maybeTelegram(
   const last = settings.last_telegram_at ? new Date(settings.last_telegram_at).getTime() : 0;
   const due = now - last >= cadenceMs(settings.telegram_cadence);
   const sql = await getSql();
+
+  const visibleMilestones = milestones.filter(
+    (hit) => hit.title === "Account" || settings.telegram_include_models,
+  );
+  if (visibleMilestones.length) {
+    await sendTelegramMessage(
+      settings.telegram_bot_token,
+      settings.telegram_chat_id,
+      formatMilestones({
+        creatorName: snapshot.profile.name,
+        handle: snapshot.profile.handle,
+        hits: visibleMilestones,
+      }),
+    );
+  }
 
   if (settings.telegram_on_change && events.length) {
     const html = formatChangeDigest({
@@ -313,10 +364,16 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
 
     const prevAccountRow = await latestSnapshot(null);
     const prevAccount = rowStats(prevAccountRow);
-    await insertSnapshot(null, snapshot.totals);
+    await insertSnapshot(null, snapshot.totals, snapshot.rating);
     const accountEvents = prevAccountRow
       ? await recordEvents(null, prevAccount, snapshot.totals, METRICS)
       : [];
+    const milestones = await claimMilestones(
+      "",
+      "Account",
+      prevAccountRow ? prevAccount : null,
+      snapshot.totals,
+    );
 
     const allEvents: TelegramEvent[] = [...accountEvents];
     const titles = new Map<string, string>();
@@ -346,9 +403,16 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
         followers: 0,
         points: model.points,
       };
+      const rating: RatingBlock = {
+        count: model.ratingCount,
+        scoreTotal: model.ratingScoreTotal,
+      };
       const prevRow = await latestSnapshot(model.designId);
       const prev = rowStats(prevRow);
-      await insertSnapshot(model.designId, stats);
+      await insertSnapshot(model.designId, stats, rating);
+      milestones.push(
+        ...(await claimMilestones(model.designId, model.title, prevRow ? prev : null, stats)),
+      );
       if (!prevRow) continue;
       const modelEvents = await recordEvents(
         model.designId,
@@ -372,7 +436,7 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
       }
     }
 
-    await maybeTelegram(settings, snapshot, allEvents);
+    await maybeTelegram(settings, snapshot, allEvents, milestones);
     return { ok: true, events: allEvents.length };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -408,6 +472,7 @@ export async function clearHistory(): Promise<void> {
   await sql`delete from mp_events`;
   await sql`delete from mp_snapshots`;
   await sql`delete from mp_models`;
+  await sql`delete from mp_milestones`;
   await sql`
     update mp_settings
     set last_poll_at = null,

@@ -200,6 +200,7 @@ function SettingsPage() {
             </div>
             <p className="text-xs text-muted-foreground">
               Each summary covers changes over that full period: 1 hour, 6 hours, 24 hours, or 7 days.
+              Milestone messages are separate: 100, 500, 1,000 and further steps for downloads and boosts.
             </p>
           </div>
           <div className="flex items-center justify-between gap-3">

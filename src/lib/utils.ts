@@ -25,6 +25,11 @@ export function formatExact(value: number | null | undefined): string {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
+export function formatStars(count: number, scoreTotal: number): string {
+  if (count <= 0) return "—";
+  return (scoreTotal / count).toFixed(1);
+}
+
 export function asDate(value: string | Date): Date {
   return value instanceof Date ? value : parseISO(value);
 }

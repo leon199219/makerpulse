@@ -6,6 +6,12 @@ Image: `ghcr.io/leon199219/makerpulse:latest`
 
 ## 2026-10-01
 
+### Added
+
+- Star rating per model and for the account, from MakerWorld print-profile ratings.
+- Each period is compared with the previous window of the same length.
+- Telegram milestone messages when downloads or boosts cross 100, 500, 1,000, and higher steps. Already-passed levels are not announced.
+
 ### Changed
 
 - Interface closer to MakerWorld: dark canvas, green actions, pill navigation, and model cards with cover, downloads, and likes.

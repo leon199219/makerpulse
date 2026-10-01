@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ConnectCreator } from "@/components/connect-creator";
-import { KpiCard } from "@/components/kpi-card";
+import { KpiCard, RatingCard } from "@/components/kpi-card";
 import { PeriodPicker } from "@/components/period-picker";
 import { StatsChart } from "@/components/stats-chart";
 import { ModelTable } from "@/components/model-table";
@@ -119,12 +119,19 @@ function Home() {
           ) : null}
 
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <RatingCard
+              count={data.rating.count}
+              scoreTotal={data.rating.scoreTotal}
+              delta={data.ratingDelta}
+              previous={data.previousRatingDelta}
+            />
             {METRICS.map((key) => (
               <KpiCard
                 key={key}
                 metric={key}
                 value={data.current[key]}
                 delta={data.deltas[key]}
+                previous={data.previous ? data.previous[key] : null}
                 active={metric === key}
                 onClick={() => setMetric(key)}
               />

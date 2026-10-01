@@ -53,7 +53,24 @@ export function periodStart(period: PeriodKey, now = new Date()): Date | null {
   return new Date(now.getTime() - match.hours * 60 * 60 * 1000);
 }
 
+export function previousPeriodStart(period: PeriodKey, now = new Date()): Date | null {
+  const start = periodStart(period, now);
+  if (!start) return null;
+  return new Date(start.getTime() - (now.getTime() - start.getTime()));
+}
+
 export type StatBlock = Record<Metric, number>;
+
+export type RatingBlock = { count: number; scoreTotal: number };
+
+export const EMPTY_RATING: RatingBlock = { count: 0, scoreTotal: 0 };
+
+export function ratingAverage(rating: RatingBlock): number | null {
+  if (rating.count <= 0) return null;
+  return rating.scoreTotal / rating.count;
+}
+
+export const MILESTONE_STEPS = [100, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000] as const;
 
 export const EMPTY_STATS: StatBlock = {
   likes: 0,

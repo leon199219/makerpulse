@@ -1,4 +1,4 @@
-import type { Metric, PeriodKey, StatBlock } from "@/lib/metrics";
+import type { Metric, PeriodKey, RatingBlock, StatBlock } from "@/lib/metrics";
 
 export type SeriesPoint = { t: string; value: number };
 
@@ -12,6 +12,8 @@ export type ModelRow = {
   removedAt: string | null;
   stats: StatBlock;
   deltas: StatBlock;
+  rating: RatingBlock;
+  ratingDelta: number;
 };
 
 export type EventRow = {
@@ -46,6 +48,10 @@ export type DashboardPayload = {
   settings: PublicSettings;
   current: StatBlock;
   deltas: StatBlock;
+  previous: StatBlock | null;
+  rating: RatingBlock;
+  ratingDelta: number;
+  previousRatingDelta: number | null;
   series: Record<Metric, SeriesPoint[]>;
   models: ModelRow[];
   removedModels: ModelRow[];

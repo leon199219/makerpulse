@@ -1,4 +1,4 @@
-import { estimatePoints, type StatBlock } from "@/lib/metrics";
+import { estimatePoints, type RatingBlock, type StatBlock } from "@/lib/metrics";
 
 const API_BASES = [
   "https://api.bambulab.com/v1",
@@ -33,12 +33,15 @@ export type MwModel = {
   comments: number;
   boosts: number;
   points: number;
+  ratingCount: number;
+  ratingScoreTotal: number;
 };
 
 export type MwSnapshot = {
   profile: MwProfile;
   models: MwModel[];
   totals: StatBlock;
+  rating: RatingBlock;
 };
 
 type Json = Record<string, unknown>;
@@ -146,6 +149,8 @@ function mapModel(raw: Json): MwModel {
     comments: num(raw.commentCount),
     boosts,
     points: estimatePoints({ prints, boosts, exclusive }),
+    ratingCount: 0,
+    ratingScoreTotal: 0,
   };
 }
 
@@ -177,8 +182,8 @@ export async function fetchPublishedModels(uid: string): Promise<MwModel[]> {
   return models;
 }
 
-/** The published-designs list under-reports commentCount. The model page does not. */
-async function withExactComments(models: MwModel[]): Promise<MwModel[]> {
+/** The published-designs list under-reports commentCount and has no star rating. */
+async function enrichModels(models: MwModel[]): Promise<MwModel[]> {
   const out = models.slice();
   let cursor = 0;
   const workers = Math.min(4, out.length);
@@ -190,9 +195,21 @@ async function withExactComments(models: MwModel[]): Promise<MwModel[]> {
       if (!model) return;
       try {
         const raw = (await fetchDesign(model.designId)) as Json;
-        if ("commentCount" in raw) out[index] = { ...model, comments: num(raw.commentCount) };
+        const instances = Array.isArray(raw.instances) ? (raw.instances as Json[]) : [];
+        let ratingCount = 0;
+        let ratingScoreTotal = 0;
+        for (const instance of instances) {
+          ratingCount += num(instance.ratingCount);
+          ratingScoreTotal += num(instance.ratingScoreTotal);
+        }
+        out[index] = {
+          ...model,
+          comments: "commentCount" in raw ? num(raw.commentCount) : model.comments,
+          ratingCount,
+          ratingScoreTotal,
+        };
       } catch {
-        // Keep the list count when the model page is briefly unavailable.
+        // Keep the list values when the model page is briefly unavailable.
       }
     }
   }
@@ -224,7 +241,7 @@ export async function collectSnapshot(uid: string): Promise<MwSnapshot> {
     fetchProfile(uid),
     fetchPublishedModels(uid),
   ]);
-  const models = await withExactComments(listed);
+  const models = await enrichModels(listed);
   const comments = models.reduce((sum, m) => sum + m.comments, 0);
   const modelPrints = models.reduce((sum, m) => sum + m.prints, 0);
   const modelBoosts = models.reduce((sum, m) => sum + m.boosts, 0);
@@ -240,5 +257,9 @@ export async function collectSnapshot(uid: string): Promise<MwSnapshot> {
     followers: profile.followers,
     points: estimatePoints({ prints, boosts }),
   };
-  return { profile, models, totals };
+  const rating: RatingBlock = {
+    count: models.reduce((sum, model) => sum + model.ratingCount, 0),
+    scoreTotal: models.reduce((sum, model) => sum + model.ratingScoreTotal, 0),
+  };
+  return { profile, models, totals, rating };
 }
