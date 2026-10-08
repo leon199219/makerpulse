@@ -141,7 +141,7 @@ function mapModel(raw: Json): MwModel {
     slug: str(raw.slug),
     coverUrl: str(raw.coverUrl ?? raw.cover),
     exclusive,
-    publishedAt: str(raw.publishTime || raw.createTime) || null,
+    publishedAt: str(raw.createTime || raw.publishTime) || null,
     likes: num(raw.likeCount),
     collections: num(raw.collectionCount),
     prints,

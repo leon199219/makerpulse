@@ -390,6 +390,7 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
           slug = excluded.slug,
           cover_url = excluded.cover_url,
           is_exclusive = excluded.is_exclusive,
+          published_at = coalesce(excluded.published_at, mp_models.published_at),
           last_seen_at = now(),
           removed_at = null
       `;

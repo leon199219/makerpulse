@@ -26,6 +26,24 @@ export const Route = createFileRoute("/statistics")({
   component: StatisticsPage,
 });
 
+function sortModels(models: ModelRow[], sortKey: SortKey, sortDir: "asc" | "desc") {
+  const copy = [...models];
+  copy.sort((a, b) => {
+    if (sortKey === "published") {
+      const at = a.publishedAt ? Date.parse(a.publishedAt) : null;
+      const bt = b.publishedAt ? Date.parse(b.publishedAt) : null;
+      if (at == null && bt == null) return a.title.localeCompare(b.title);
+      if (at == null) return 1;
+      if (bt == null) return -1;
+      return sortDir === "asc" ? at - bt : bt - at;
+    }
+    const cmp = a.stats[sortKey] - b.stats[sortKey];
+    if (cmp !== 0) return sortDir === "asc" ? cmp : -cmp;
+    return a.title.localeCompare(b.title);
+  });
+  return copy;
+}
+
 function StatisticsPage() {
   const initial = Route.useLoaderData();
   const dash = useQuery({
@@ -36,25 +54,11 @@ function StatisticsPage() {
   const [sortKey, setSortKey] = useState<SortKey>("downloads");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const models = useMemo(() => {
-    const published = dash.data?.models ?? [];
-    const removed = dash.data?.removedModels ?? [];
-    const copy = [...published, ...removed];
-    copy.sort((a, b) => {
-      if (sortKey === "published") {
-        const at = a.publishedAt ? Date.parse(a.publishedAt) : null;
-        const bt = b.publishedAt ? Date.parse(b.publishedAt) : null;
-        if (at == null && bt == null) return a.title.localeCompare(b.title);
-        if (at == null) return 1;
-        if (bt == null) return -1;
-        return sortDir === "asc" ? at - bt : bt - at;
-      }
-      const cmp = a.stats[sortKey] - b.stats[sortKey];
-      if (cmp !== 0) return sortDir === "asc" ? cmp : -cmp;
-      return a.title.localeCompare(b.title);
-    });
-    return copy;
+  const published = useMemo(() => {
+    const list = dash.data?.models ?? [];
+    return sortModels(list, sortKey, sortDir);
   }, [dash.data, sortKey, sortDir]);
+  const removed = useMemo(() => dash.data?.removedModels ?? [], [dash.data]);
 
   function sortBy(key: ColumnKey) {
     if (sortKey === key) {
@@ -72,7 +76,7 @@ function StatisticsPage() {
 
   const totals = COLUMNS.map((column) => ({
     ...column,
-    value: models.reduce((sum, model) => sum + model.stats[column.key], 0),
+    value: published.reduce((sum, model) => sum + model.stats[column.key], 0),
   }));
 
   return (
@@ -111,7 +115,7 @@ function StatisticsPage() {
       </div>
       <Card>
         <CardContent className="p-0 sm:p-2">
-          {models.length === 0 ? (
+          {published.length === 0 ? (
             <p className="px-4 py-8 text-sm text-muted-foreground">Models appear after the first successful sync.</p>
           ) : (
             <div className="w-full overflow-x-auto">
@@ -146,13 +150,13 @@ function StatisticsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {models.map((model) => (
+                  {published.map((model) => (
                     <Row key={model.designId} model={model} />
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-border font-medium">
-                    <td className="px-4 py-3 text-foreground">{models.length} models</td>
+                    <td className="px-4 py-3 text-foreground">{published.length} models</td>
                     {totals.map((column) => (
                       <td key={column.key} className="px-3 py-3 text-right tabular-nums">
                         {formatExact(column.value)}
@@ -165,6 +169,31 @@ function StatisticsPage() {
           )}
         </CardContent>
       </Card>
+      {removed.length > 0 ? (
+        <Card>
+          <CardContent className="flex flex-col gap-3 pt-6">
+            <h2 className="text-base font-medium text-foreground">Removed from MakerWorld</h2>
+            <ul className="divide-y divide-border">
+              {removed.map((model) => (
+                <li key={model.designId}>
+                  <Link
+                    to="/models/$designId"
+                    params={{ designId: model.designId }}
+                    className="flex items-center gap-3 py-3 hover:text-primary"
+                  >
+                    {model.coverUrl ? (
+                      <img src={model.coverUrl} alt="" className="size-10 shrink-0 rounded-md object-cover" />
+                    ) : (
+                      <span className="size-10 shrink-0 rounded-md bg-secondary" />
+                    )}
+                    <span className="min-w-0 truncate text-sm font-medium">{model.title}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
     </AppShell>
   );
 }
@@ -185,7 +214,6 @@ function Row({ model }: { model: ModelRow }) {
           )}
           <span className="min-w-0">
             <span className="block max-w-[280px] truncate font-medium">{model.title}</span>
-            {model.removedAt ? <span className="text-xs text-muted-foreground">Removed</span> : null}
           </span>
         </Link>
       </td>
