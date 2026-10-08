@@ -131,6 +131,18 @@ function mapProfile(raw: Json): MwProfile {
   };
 }
 
+function releaseTime(raw: Json, extra: string[] = []): string | null {
+  const created = str(raw.createTime);
+  const published = str(raw.publishTime);
+  const updated = str(raw.userLastUpdateTime);
+  const copiedFromUpdate = Boolean(published && updated && published === updated);
+  const candidates = [created, copiedFromUpdate ? "" : published, ...extra].filter(
+    (value) => Boolean(value) && !Number.isNaN(Date.parse(value)),
+  );
+  if (candidates.length === 0) return created || published || null;
+  return candidates.sort()[0] ?? null;
+}
+
 function mapModel(raw: Json): MwModel {
   const prints = num(raw.printCount);
   const boosts = num(raw.boostCnt ?? raw.boostCount);
@@ -141,7 +153,7 @@ function mapModel(raw: Json): MwModel {
     slug: str(raw.slug),
     coverUrl: str(raw.coverUrl ?? raw.cover),
     exclusive,
-    publishedAt: str(raw.createTime || raw.publishTime) || null,
+    publishedAt: releaseTime(raw),
     likes: num(raw.likeCount),
     collections: num(raw.collectionCount),
     prints,
@@ -202,9 +214,13 @@ async function enrichModels(models: MwModel[]): Promise<MwModel[]> {
           ratingCount += num(instance.ratingCount);
           ratingScoreTotal += num(instance.ratingScoreTotal);
         }
+        const instanceTimes = instances.flatMap((instance) => {
+          const value = str(instance.createTime || instance.publishTime);
+          return value ? [value] : [];
+        });
         out[index] = {
           ...model,
-          publishedAt: str(raw.createTime) || model.publishedAt,
+          publishedAt: releaseTime(raw, instanceTimes),
           comments: "commentCount" in raw ? num(raw.commentCount) : model.comments,
           ratingCount,
           ratingScoreTotal,
