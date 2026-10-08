@@ -16,6 +16,7 @@ Image: `ghcr.io/leon199219/makerpulse:latest`
 
 ### Changed
 
+- README screenshots show the current dark interface: Overview, Models, Statistics, Activity, and Settings.
 - On Models, Likes, Collections, Prints, Downloads, Comments, Boosts, and Est. points sort by the change in the selected period. All still sorts by the all-time total.
 - Models can switch between grid and list. The list uses a small cover image. The choice is remembered in the browser. Grid and List sit on the right of the sort row.
 

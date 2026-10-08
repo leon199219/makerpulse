@@ -10,9 +10,13 @@ Self-hosted **MakerWorld** creator analytics. Track likes, collections, prints, 
 
 ![Overview](screenshots/home.png)
 
-| Overview | Models | Activity |
-| --- | --- | --- |
-| Period KPIs and charts (`1h`–`ALL`) | Sort by date or any metric | Filterable changelog |
+| Models | Statistics |
+| --- | --- |
+| ![Models](screenshots/models.png) | ![Statistics](screenshots/statistics.png) |
+
+| Activity | Settings |
+| --- | --- |
+| ![Activity](screenshots/activity.png) | ![Settings](screenshots/settings.png) |
 
 ## Features
 
