@@ -8,7 +8,7 @@ Image: `ghcr.io/leon199219/makerpulse:latest`
 
 ### Added
 
-- Statistics page with a table of every model: Likes, Collected, Comments, Boosts, Downloads, and Prints.
+- Statistics page with a table of every model: Likes, Collected, Comments, Boosts, Downloads, and Prints. Newest first and Oldest first sort by publish date.
 
 ### Changed
 

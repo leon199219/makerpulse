@@ -19,6 +19,7 @@ const COLUMNS = [
 ] as const satisfies ReadonlyArray<{ key: Metric; label: string }>;
 
 type ColumnKey = (typeof COLUMNS)[number]["key"];
+type SortKey = ColumnKey | "published";
 
 export const Route = createFileRoute("/statistics")({
   loader: () => loadDashboard({ data: { period: "all" } }),
@@ -32,15 +33,22 @@ function StatisticsPage() {
     queryFn: () => loadDashboard({ data: { period: "all" } }),
     initialData: initial,
   });
-  const [sortKey, setSortKey] = useState<ColumnKey>("downloads");
+  const [sortKey, setSortKey] = useState<SortKey>("downloads");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const models = useMemo(() => {
     const published = dash.data?.models ?? [];
     const removed = dash.data?.removedModels ?? [];
-    const list = [...published, ...removed];
-    const copy = [...list];
+    const copy = [...published, ...removed];
     copy.sort((a, b) => {
+      if (sortKey === "published") {
+        const at = a.publishedAt ? Date.parse(a.publishedAt) : null;
+        const bt = b.publishedAt ? Date.parse(b.publishedAt) : null;
+        if (at == null && bt == null) return a.title.localeCompare(b.title);
+        if (at == null) return 1;
+        if (bt == null) return -1;
+        return sortDir === "asc" ? at - bt : bt - at;
+      }
       const cmp = a.stats[sortKey] - b.stats[sortKey];
       if (cmp !== 0) return sortDir === "asc" ? cmp : -cmp;
       return a.title.localeCompare(b.title);
@@ -57,6 +65,11 @@ function StatisticsPage() {
     setSortDir("desc");
   }
 
+  function sortByPublished(dir: "asc" | "desc") {
+    setSortKey("published");
+    setSortDir(dir);
+  }
+
   const totals = COLUMNS.map((column) => ({
     ...column,
     value: models.reduce((sum, model) => sum + model.stats[column.key], 0),
@@ -64,9 +77,37 @@ function StatisticsPage() {
 
   return (
     <AppShell>
-      <div>
-        <h1 className="text-2xl font-medium tracking-tight">Statistics</h1>
-        <p className="text-sm text-muted-foreground">Current totals for every model.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-medium tracking-tight">Statistics</h1>
+          <p className="text-sm text-muted-foreground">Current totals for every model.</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => sortByPublished("desc")}
+            className={cn(
+              "inline-flex h-9 items-center justify-center rounded-full px-3.5 text-xs font-medium",
+              sortKey === "published" && sortDir === "desc"
+                ? "bg-foreground text-background"
+                : "bg-secondary text-foreground/85 hover:bg-accent",
+            )}
+          >
+            Newest first
+          </button>
+          <button
+            type="button"
+            onClick={() => sortByPublished("asc")}
+            className={cn(
+              "inline-flex h-9 items-center justify-center rounded-full px-3.5 text-xs font-medium",
+              sortKey === "published" && sortDir === "asc"
+                ? "bg-foreground text-background"
+                : "bg-secondary text-foreground/85 hover:bg-accent",
+            )}
+          >
+            Oldest first
+          </button>
+        </div>
       </div>
       <Card>
         <CardContent className="p-0 sm:p-2">
