@@ -151,7 +151,7 @@ function StatisticsPage() {
                 </thead>
                 <tbody>
                   {published.map((model) => (
-                    <Row key={model.designId} model={model} />
+                    <Row key={model.designId} model={model} showDate={sortKey === "published"} />
                   ))}
                 </tbody>
                 <tfoot>
@@ -198,7 +198,7 @@ function StatisticsPage() {
   );
 }
 
-function Row({ model }: { model: ModelRow }) {
+function Row({ model, showDate }: { model: ModelRow; showDate: boolean }) {
   return (
     <tr className="border-b border-border/70 last:border-0">
       <td className="px-4 py-3">
@@ -214,6 +214,11 @@ function Row({ model }: { model: ModelRow }) {
           )}
           <span className="min-w-0">
             <span className="block max-w-[280px] truncate font-medium">{model.title}</span>
+            {showDate && model.publishedAt ? (
+              <span className="block text-xs text-muted-foreground">
+                {model.publishedAt.slice(0, 10)}
+              </span>
+            ) : null}
           </span>
         </Link>
       </td>

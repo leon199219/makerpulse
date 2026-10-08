@@ -204,6 +204,7 @@ async function enrichModels(models: MwModel[]): Promise<MwModel[]> {
         }
         out[index] = {
           ...model,
+          publishedAt: str(raw.createTime) || model.publishedAt,
           comments: "commentCount" in raw ? num(raw.commentCount) : model.comments,
           ratingCount,
           ratingScoreTotal,

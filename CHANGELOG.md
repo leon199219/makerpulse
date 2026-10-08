@@ -8,7 +8,7 @@ Image: `ghcr.io/leon199219/makerpulse:latest`
 
 ### Added
 
-- Statistics page with a table of every published model: Likes, Collected, Comments, Boosts, Downloads, and Prints. Newest first and Oldest first use the original release date. Removed models sit in a separate list.
+- Statistics page with a table of every published model: Likes, Collected, Comments, Boosts, Downloads, and Prints. Newest first and Oldest first use the original release date, not a later update. Removed models sit in a separate list.
 
 ### Changed
 
