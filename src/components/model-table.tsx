@@ -11,6 +11,7 @@ export function sortModels(
   models: ModelRow[],
   sortKey: ModelSortKey,
   sortDir: ModelSortDir,
+  byPeriodChange = false,
 ): ModelRow[] {
   const copy = [...models];
   copy.sort((a, b) => {
@@ -22,7 +23,8 @@ export function sortModels(
       if (bt == null) return -1;
       return sortDir === "asc" ? at - bt : bt - at;
     }
-    const cmp = a.stats[sortKey] - b.stats[sortKey];
+    const value = (model: ModelRow) => (byPeriodChange ? model.deltas[sortKey] : model.stats[sortKey]);
+    const cmp = value(a) - value(b);
     if (cmp !== 0) return sortDir === "asc" ? cmp : -cmp;
     return a.title.localeCompare(b.title);
   });
@@ -34,11 +36,13 @@ export function ModelTable({
   sortKey,
   sortDir,
   onSort,
+  sortByChange = false,
 }: {
   models: ModelRow[];
   sortKey?: ModelSortKey;
   sortDir?: ModelSortDir;
   onSort?: (key: Metric) => void;
+  sortByChange?: boolean;
 }) {
   if (models.length === 0) {
     return (
@@ -77,6 +81,9 @@ export function ModelTable({
             );
           })}
         </div>
+      ) : null}
+      {sortByChange && sortKey && sortKey !== "published" ? (
+        <p className="text-xs text-muted-foreground">Ranked by change in this period, not the all-time total.</p>
       ) : null}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
         {models.map((model) => {

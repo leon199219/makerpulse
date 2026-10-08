@@ -4,6 +4,12 @@ User-facing changes to MakerPulse. Newest first.
 
 Image: `ghcr.io/leon199219/makerpulse:latest`
 
+## 2026-10-08
+
+### Changed
+
+- On Models, Likes, Collections, Prints, Downloads, Comments, Boosts, and Est. points sort by the change in the selected period. All still sorts by the all-time total.
+
 ## 2026-10-01
 
 ### Added

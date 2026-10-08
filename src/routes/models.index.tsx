@@ -30,8 +30,8 @@ function ModelsPage() {
     const list = dash.data?.models ?? [];
     const needle = q.trim().toLowerCase();
     const filtered = needle ? list.filter((m) => m.title.toLowerCase().includes(needle)) : list;
-    return sortModels(filtered, sortKey, sortDir);
-  }, [dash.data, q, sortKey, sortDir]);
+    return sortModels(filtered, sortKey, sortDir, period !== "all");
+  }, [dash.data, q, sortKey, sortDir, period]);
   const removed = useMemo(() => {
     const list = dash.data?.removedModels ?? [];
     const needle = q.trim().toLowerCase();
@@ -101,7 +101,13 @@ function ModelsPage() {
           <CardTitle className="text-foreground">{models.length} published</CardTitle>
         </CardHeader>
         <CardContent>
-          <ModelTable models={models} sortKey={sortKey} sortDir={sortDir} onSort={sortByMetric} />
+          <ModelTable
+            models={models}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={sortByMetric}
+            sortByChange={period !== "all"}
+          />
         </CardContent>
       </Card>
       {removed.length > 0 ? (
