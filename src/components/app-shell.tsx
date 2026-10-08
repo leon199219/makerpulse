@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Activity, LayoutDashboard, Settings2, Boxes } from "lucide-react";
+import { Activity, LayoutDashboard, Settings2, Boxes, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
   { to: "/models", label: "Models", icon: Boxes },
+  { to: "/statistics", label: "Statistics", icon: Table2 },
   { to: "/activity", label: "Activity", icon: Activity },
   { to: "/settings", label: "Settings", icon: Settings2 },
 ] as const;
@@ -56,7 +57,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {children}
       </div>
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 backdrop-blur sm:hidden">
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {NAV.map((item) => {
             const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;

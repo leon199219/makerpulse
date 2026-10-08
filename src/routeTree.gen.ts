@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as ModelsRouteImport } from './routes/models'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as StatisticsRouteImport } from './routes/statistics'
 import { Route as ApiCronRouteImport } from './routes/api/cron'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiStatsRouteImport } from './routes/api/stats'
@@ -37,6 +38,11 @@ const ModelsRoute = ModelsRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StatisticsRoute = StatisticsRouteImport.update({
+  id: '/statistics',
+  path: '/statistics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCronRoute = ApiCronRouteImport.update({
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/activity': typeof ActivityRoute
   '/models': typeof ModelsRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/statistics': typeof StatisticsRoute
   '/api/cron': typeof ApiCronRoute
   '/api/health': typeof ApiHealthRoute
   '/api/stats': typeof ApiStatsRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
   '/settings': typeof SettingsRoute
+  '/statistics': typeof StatisticsRoute
   '/api/cron': typeof ApiCronRoute
   '/api/health': typeof ApiHealthRoute
   '/api/stats': typeof ApiStatsRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/activity': typeof ActivityRoute
   '/models': typeof ModelsRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/statistics': typeof StatisticsRoute
   '/api/cron': typeof ApiCronRoute
   '/api/health': typeof ApiHealthRoute
   '/api/stats': typeof ApiStatsRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/models'
     | '/settings'
+    | '/statistics'
     | '/api/cron'
     | '/api/health'
     | '/api/stats'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activity'
     | '/settings'
+    | '/statistics'
     | '/api/cron'
     | '/api/health'
     | '/api/stats'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '/activity'
     | '/models'
     | '/settings'
+    | '/statistics'
     | '/api/cron'
     | '/api/health'
     | '/api/stats'
@@ -138,6 +150,7 @@ export interface RootRouteChildren {
   ActivityRoute: typeof ActivityRoute
   ModelsRoute: typeof ModelsRouteWithChildren
   SettingsRoute: typeof SettingsRoute
+  StatisticsRoute: typeof StatisticsRoute
   ApiCronRoute: typeof ApiCronRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiStatsRoute: typeof ApiStatsRoute
@@ -171,6 +184,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/statistics': {
+      id: '/statistics'
+      path: '/statistics'
+      fullPath: '/statistics'
+      preLoaderRoute: typeof StatisticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/cron': {
@@ -229,6 +249,7 @@ const rootRouteChildren: RootRouteChildren = {
   ActivityRoute: ActivityRoute,
   ModelsRoute: ModelsRouteWithChildren,
   SettingsRoute: SettingsRoute,
+  StatisticsRoute: StatisticsRoute,
   ApiCronRoute: ApiCronRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiStatsRoute: ApiStatsRoute,

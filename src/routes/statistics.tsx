@@ -1,0 +1,158 @@
+import { useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowDown, ArrowUp } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+import { Card, CardContent } from "@/components/ui/card";
+import { loadDashboard } from "@/lib/dashboard";
+import type { ModelRow } from "@/lib/dashboard-types";
+import type { Metric } from "@/lib/metrics";
+import { cn, formatExact } from "@/lib/utils";
+
+const COLUMNS = [
+  { key: "likes", label: "Likes" },
+  { key: "collections", label: "Collected" },
+  { key: "comments", label: "Comments" },
+  { key: "boosts", label: "Boosts" },
+  { key: "downloads", label: "Downloads" },
+  { key: "prints", label: "Prints" },
+] as const satisfies ReadonlyArray<{ key: Metric; label: string }>;
+
+type ColumnKey = (typeof COLUMNS)[number]["key"];
+
+export const Route = createFileRoute("/statistics")({
+  loader: () => loadDashboard({ data: { period: "all" } }),
+  component: StatisticsPage,
+});
+
+function StatisticsPage() {
+  const initial = Route.useLoaderData();
+  const dash = useQuery({
+    queryKey: ["dashboard", "all"],
+    queryFn: () => loadDashboard({ data: { period: "all" } }),
+    initialData: initial,
+  });
+  const [sortKey, setSortKey] = useState<ColumnKey>("downloads");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const models = useMemo(() => {
+    const published = dash.data?.models ?? [];
+    const removed = dash.data?.removedModels ?? [];
+    const list = [...published, ...removed];
+    const copy = [...list];
+    copy.sort((a, b) => {
+      const cmp = a.stats[sortKey] - b.stats[sortKey];
+      if (cmp !== 0) return sortDir === "asc" ? cmp : -cmp;
+      return a.title.localeCompare(b.title);
+    });
+    return copy;
+  }, [dash.data, sortKey, sortDir]);
+
+  function sortBy(key: ColumnKey) {
+    if (sortKey === key) {
+      setSortDir((dir) => (dir === "desc" ? "asc" : "desc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir("desc");
+  }
+
+  const totals = COLUMNS.map((column) => ({
+    ...column,
+    value: models.reduce((sum, model) => sum + model.stats[column.key], 0),
+  }));
+
+  return (
+    <AppShell>
+      <div>
+        <h1 className="text-2xl font-medium tracking-tight">Statistics</h1>
+        <p className="text-sm text-muted-foreground">Current totals for every model.</p>
+      </div>
+      <Card>
+        <CardContent className="p-0 sm:p-2">
+          {models.length === 0 ? (
+            <p className="px-4 py-8 text-sm text-muted-foreground">Models appear after the first successful sync.</p>
+          ) : (
+            <div className="w-full overflow-x-auto">
+              <table className="w-full min-w-[880px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs text-muted-foreground">
+                    <th className="px-4 py-3 font-medium">Model</th>
+                    {COLUMNS.map((column) => {
+                      const active = sortKey === column.key;
+                      return (
+                        <th key={column.key} className="px-2 py-1 text-right font-medium">
+                          <button
+                            type="button"
+                            onClick={() => sortBy(column.key)}
+                            className={cn(
+                              "inline-flex h-11 items-center gap-1 rounded-md px-1 text-xs font-medium hover:text-foreground",
+                              active ? "text-foreground" : "text-muted-foreground",
+                            )}
+                          >
+                            {column.label}
+                            {active ? (
+                              sortDir === "asc" ? (
+                                <ArrowUp className="size-3.5" />
+                              ) : (
+                                <ArrowDown className="size-3.5" />
+                              )
+                            ) : null}
+                          </button>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {models.map((model) => (
+                    <Row key={model.designId} model={model} />
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-border font-medium">
+                    <td className="px-4 py-3 text-foreground">{models.length} models</td>
+                    {totals.map((column) => (
+                      <td key={column.key} className="px-3 py-3 text-right tabular-nums">
+                        {formatExact(column.value)}
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </AppShell>
+  );
+}
+
+function Row({ model }: { model: ModelRow }) {
+  return (
+    <tr className="border-b border-border/70 last:border-0">
+      <td className="px-4 py-3">
+        <Link
+          to="/models/$designId"
+          params={{ designId: model.designId }}
+          className="flex items-center gap-3 hover:text-primary"
+        >
+          {model.coverUrl ? (
+            <img src={model.coverUrl} alt="" className="size-10 shrink-0 rounded-md object-cover" />
+          ) : (
+            <span className="size-10 shrink-0 rounded-md bg-secondary" />
+          )}
+          <span className="min-w-0">
+            <span className="block max-w-[280px] truncate font-medium">{model.title}</span>
+            {model.removedAt ? <span className="text-xs text-muted-foreground">Removed</span> : null}
+          </span>
+        </Link>
+      </td>
+      {COLUMNS.map((column) => (
+        <td key={column.key} className="px-3 py-3 text-right tabular-nums">
+          {formatExact(model.stats[column.key])}
+        </td>
+      ))}
+    </tr>
+  );
+}

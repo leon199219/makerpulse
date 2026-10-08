@@ -6,6 +6,10 @@ Image: `ghcr.io/leon199219/makerpulse:latest`
 
 ## 2026-10-08
 
+### Added
+
+- Statistics page with a table of every model: Likes, Collected, Comments, Boosts, Downloads, and Prints.
+
 ### Changed
 
 - On Models, Likes, Collections, Prints, Downloads, Comments, Boosts, and Est. points sort by the change in the selected period. All still sorts by the all-time total.
