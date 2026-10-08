@@ -8,7 +8,11 @@ Image: `ghcr.io/leon199219/makerpulse:latest`
 
 ### Added
 
-- Statistics page with a table of every published model: Likes, Collected, Comments, Boosts, Downloads, and Prints. Newest first and Oldest first use the original release date, not a later update. Removed models sit in a separate list.
+- Statistics page with a table of every published model: Likes, Collected, Comments, Boosts, Downloads, and Prints. Column headers sort the table. Newest first and Oldest first sort by release date, and that date is shown under the model name. Removed models sit in a separate list under the table and are left out of the totals.
+
+### Fixed
+
+- Newest first and Oldest first use the original release date. MakerWorld sometimes copies a later update into `publishTime` (EasyThreed filament holder was stored as 2026-06-28 instead of its 2025-01-27 release). The next sync overwrites that saved date.
 
 ### Changed
 
