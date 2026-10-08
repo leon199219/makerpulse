@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
-import { ModelTable, sortModels, type ModelSortDir, type ModelSortKey } from "@/components/model-table";
+import { ModelTable, sortModels, type ModelSortDir, type ModelSortKey, type ModelView } from "@/components/model-table";
 import { PeriodPicker } from "@/components/period-picker";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ function ModelsPage() {
   const [q, setQ] = useState("");
   const [sortKey, setSortKey] = useState<ModelSortKey>("published");
   const [sortDir, setSortDir] = useState<ModelSortDir>("desc");
+  const [view, setView] = useState<ModelView>("grid");
   const initial = Route.useLoaderData();
   const dash = useQuery({
     queryKey: ["dashboard", period],
@@ -37,6 +38,16 @@ function ModelsPage() {
     const needle = q.trim().toLowerCase();
     return needle ? list.filter((m) => m.title.toLowerCase().includes(needle)) : list;
   }, [dash.data, q]);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem("mp-models-view");
+    if (stored === "list" || stored === "grid") setView(stored);
+  }, []);
+
+  function setModelView(next: ModelView) {
+    setView(next);
+    window.localStorage.setItem("mp-models-view", next);
+  }
 
   function sortByPublished(dir: ModelSortDir) {
     setSortKey("published");
@@ -107,6 +118,8 @@ function ModelsPage() {
             sortDir={sortDir}
             onSort={sortByMetric}
             sortByChange={period !== "all"}
+            view={view}
+            onViewChange={setModelView}
           />
         </CardContent>
       </Card>

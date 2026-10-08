@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Download, Heart, Star } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, Heart, LayoutGrid, List, Star } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { METRIC_LABELS, MODEL_METRICS, type Metric } from "@/lib/metrics";
 import { cn, formatDelta, formatExact, formatStars } from "@/lib/utils";
@@ -31,18 +31,24 @@ export function sortModels(
   return copy;
 }
 
+export type ModelView = "grid" | "list";
+
 export function ModelTable({
   models,
   sortKey,
   sortDir,
   onSort,
   sortByChange = false,
+  view = "grid",
+  onViewChange,
 }: {
   models: ModelRow[];
   sortKey?: ModelSortKey;
   sortDir?: ModelSortDir;
   onSort?: (key: Metric) => void;
   sortByChange?: boolean;
+  view?: ModelView;
+  onViewChange?: (view: ModelView) => void;
 }) {
   if (models.length === 0) {
     return (
@@ -85,6 +91,91 @@ export function ModelTable({
       {sortByChange && sortKey && sortKey !== "published" ? (
         <p className="text-xs text-muted-foreground">Ranked by change in this period, not the all-time total.</p>
       ) : null}
+      {onViewChange ? (
+        <div className="flex gap-2" role="group" aria-label="Model layout">
+          <button
+            type="button"
+            aria-pressed={view === "grid"}
+            onClick={() => onViewChange("grid")}
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-medium",
+              view === "grid" ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
+            )}
+          >
+            <LayoutGrid className="size-3.5" />
+            Grid
+          </button>
+          <button
+            type="button"
+            aria-pressed={view === "list"}
+            onClick={() => onViewChange("list")}
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-medium",
+              view === "list" ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
+            )}
+          >
+            <List className="size-3.5" />
+            List
+          </button>
+        </div>
+      ) : null}
+      {view === "list" ? (
+        <ul className="divide-y divide-border">
+          {models.map((model) => {
+            const focus = sortKey && sortKey !== "published" ? sortKey : "downloads";
+            const delta = model.deltas[focus];
+            return (
+              <li key={model.designId}>
+                <Link
+                  to="/models/$designId"
+                  params={{ designId: model.designId }}
+                  className="flex items-center gap-3 py-3 hover:text-primary"
+                >
+                  {model.coverUrl ? (
+                    <img
+                      src={model.coverUrl}
+                      alt=""
+                      className="size-12 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <span className="size-12 shrink-0 rounded-lg bg-secondary" />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">{model.title}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 tabular-nums">
+                        <Download className="size-3.5" />
+                        {formatExact(model.stats.downloads)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 tabular-nums">
+                        <Heart className="size-3.5" />
+                        {formatExact(model.stats.likes)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 tabular-nums">
+                        <Star className="size-3.5" />
+                        {formatStars(model.rating.count, model.rating.scoreTotal)}
+                      </span>
+                      {focus !== "downloads" && focus !== "likes" ? (
+                        <span className="tabular-nums">
+                          {METRIC_LABELS[focus]} {formatExact(sortByChange ? delta : model.stats[focus])}
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 text-sm tabular-nums",
+                      delta > 0 ? "text-success" : delta < 0 ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {formatDelta(delta)}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
         {models.map((model) => {
           const focus = sortKey && sortKey !== "published" ? sortKey : "downloads";
@@ -141,6 +232,7 @@ export function ModelTable({
           );
         })}
       </div>
+      )}
     </div>
   );
 }
