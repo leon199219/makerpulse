@@ -60,65 +60,66 @@ export function ModelTable({
 
   return (
     <div className="flex flex-col gap-4">
-      {onSort ? (
-        <div className="flex flex-wrap gap-2">
-          {MODEL_METRICS.map((metric) => {
-            const active = sortKey === metric;
-            return (
-              <button
-                key={metric}
-                type="button"
-                onClick={() => onSort(metric)}
-                className={cn(
-                  "inline-flex h-9 items-center gap-1 rounded-full px-3.5 text-xs font-medium transition-colors",
-                  active ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
-                )}
-                aria-label={`Sort by ${METRIC_LABELS[metric]}`}
-              >
-                {METRIC_LABELS[metric]}
-                {active ? (
-                  sortDir === "asc" ? (
-                    <ArrowUp className="size-3.5" />
-                  ) : (
-                    <ArrowDown className="size-3.5" />
-                  )
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-      {sortByChange && sortKey && sortKey !== "published" ? (
-        <p className="text-xs text-muted-foreground">Ranked by change in this period, not the all-time total.</p>
-      ) : null}
-      {onViewChange ? (
-        <div className="flex gap-2" role="group" aria-label="Model layout">
-          <button
-            type="button"
-            aria-pressed={view === "grid"}
-            onClick={() => onViewChange("grid")}
-            className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-medium",
-              view === "grid" ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
-            )}
-          >
-            <LayoutGrid className="size-3.5" />
-            Grid
-          </button>
-          <button
-            type="button"
-            aria-pressed={view === "list"}
-            onClick={() => onViewChange("list")}
-            className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-medium",
-              view === "list" ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
-            )}
-          >
-            <List className="size-3.5" />
-            List
-          </button>
-        </div>
-      ) : null}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        {onSort ? (
+          <div className="flex flex-wrap gap-2">
+            {MODEL_METRICS.map((metric) => {
+              const active = sortKey === metric;
+              return (
+                <button
+                  key={metric}
+                  type="button"
+                  onClick={() => onSort(metric)}
+                  className={cn(
+                    "inline-flex h-9 items-center gap-1 rounded-full px-3.5 text-xs font-medium transition-colors",
+                    active ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
+                  )}
+                  aria-label={`Sort by ${METRIC_LABELS[metric]}`}
+                >
+                  {METRIC_LABELS[metric]}
+                  {active ? (
+                    sortDir === "asc" ? (
+                      <ArrowUp className="size-3.5" />
+                    ) : (
+                      <ArrowDown className="size-3.5" />
+                    )
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <span />
+        )}
+        {onViewChange ? (
+          <div className="ml-auto flex shrink-0 gap-2" role="group" aria-label="Model layout">
+            <button
+              type="button"
+              aria-pressed={view === "grid"}
+              onClick={() => onViewChange("grid")}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-medium",
+                view === "grid" ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
+              )}
+            >
+              <LayoutGrid className="size-3.5" />
+              Grid
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === "list"}
+              onClick={() => onViewChange("list")}
+              className={cn(
+                "inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-medium",
+                view === "list" ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
+              )}
+            >
+              <List className="size-3.5" />
+              List
+            </button>
+          </div>
+        ) : null}
+      </div>
       {view === "list" ? (
         <ul className="divide-y divide-border">
           {models.map((model) => {
