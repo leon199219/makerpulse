@@ -4,6 +4,12 @@ User-facing changes to MakerPulse. Newest first.
 
 Image: `ghcr.io/leon199219/makerpulse:latest`
 
+## 2026-11-06
+
+### Added
+
+- Settings can import a MakerPulse snapshot CSV as a history backup. Rows that already exist for the same time are skipped. Settings are not changed.
+
 ## 2026-10-08
 
 ### Added

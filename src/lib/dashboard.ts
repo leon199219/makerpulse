@@ -513,3 +513,189 @@ export const exportCsv = createServerFn({ method: "POST" }).handler(async () => 
   });
   return { csv: [header, ...lines].join("\n") };
 });
+
+const SNAPSHOT_COLUMNS = [
+  "taken_at",
+  "scope",
+  "design_id",
+  "title",
+  "likes",
+  "collections",
+  "prints",
+  "downloads",
+  "comments",
+  "boosts",
+  "followers",
+  "points",
+] as const;
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  const src = text.replace(/^\uFEFF/, "");
+  for (let i = 0; i < src.length; i += 1) {
+    const char = src[i];
+    if (quoted) {
+      if (char === '"') {
+        if (src[i + 1] === '"') {
+          field += '"';
+          i += 1;
+        } else quoted = false;
+      } else field += char;
+      continue;
+    }
+    if (char === '"') quoted = true;
+    else if (char === ",") {
+      row.push(field);
+      field = "";
+    } else if (char === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else if (char !== "\r") field += char;
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows.filter((cells) => cells.some((cell) => cell.trim() !== ""));
+}
+
+function csvInt(value: string): number {
+  if (!value.trim()) return 0;
+  const n = Number(value);
+  if (!Number.isFinite(n)) throw new Error("A snapshot row has a value that is not a number.");
+  return Math.round(n);
+}
+
+export const importCsv = createServerFn({ method: "POST" })
+  .validator((d: unknown) => z.object({ csv: z.string().min(1).max(25_000_000) }).parse(d))
+  .handler(async ({ data }) => {
+    const table = parseCsv(data.csv);
+    const header = table[0]?.map((cell) => cell.trim()) ?? [];
+    const index = new Map(header.map((name, i) => [name, i]));
+    for (const column of SNAPSHOT_COLUMNS) {
+      if (!index.has(column)) throw new Error("This file is not a MakerPulse snapshot export.");
+    }
+    const cell = (cells: string[], name: string) => cells[index.get(name) ?? -1] ?? "";
+    const ratingCountCol = index.has("rating_count");
+    const ratingScoreCol = index.has("rating_score_total");
+    type SnapshotInsert = {
+      takenAt: string;
+      designId: string | null;
+      title: string;
+      likes: number;
+      collections: number;
+      prints: number;
+      downloads: number;
+      comments: number;
+      boosts: number;
+      followers: number;
+      points: number;
+      ratingCount: number;
+      ratingScoreTotal: number;
+    };
+    const snapshots: SnapshotInsert[] = [];
+    for (let i = 1; i < table.length; i += 1) {
+      const cells = table[i] ?? [];
+      const takenAt = cell(cells, "taken_at").trim();
+      if (Number.isNaN(Date.parse(takenAt))) {
+        throw new Error(`Row ${i + 1} has an invalid taken_at.`);
+      }
+      const scope = cell(cells, "scope").trim();
+      const designId = cell(cells, "design_id").trim();
+      if (scope !== "account" && scope !== "model") {
+        throw new Error(`Row ${i + 1} has an unknown scope.`);
+      }
+      if (scope === "model" && !designId) throw new Error(`Row ${i + 1} is a model without a design id.`);
+      const title = cell(cells, "title").trim() || (designId ? `Model ${designId}` : "Account");
+      snapshots.push({
+        takenAt: new Date(takenAt).toISOString(),
+        designId: scope === "account" ? null : designId,
+        title,
+        likes: csvInt(cell(cells, "likes")),
+        collections: csvInt(cell(cells, "collections")),
+        prints: csvInt(cell(cells, "prints")),
+        downloads: csvInt(cell(cells, "downloads")),
+        comments: csvInt(cell(cells, "comments")),
+        boosts: csvInt(cell(cells, "boosts")),
+        followers: csvInt(cell(cells, "followers")),
+        points: csvInt(cell(cells, "points")),
+        ratingCount: ratingCountCol ? csvInt(cell(cells, "rating_count")) : 0,
+        ratingScoreTotal: ratingScoreCol ? csvInt(cell(cells, "rating_score_total")) : 0,
+      });
+    }
+    if (snapshots.length === 0) throw new Error("The CSV has no snapshot rows.");
+    const unique = new Map<string, (typeof snapshots)[number]>();
+    for (const row of snapshots) unique.set(`${row.takenAt}\0${row.designId ?? ""}`, row);
+    const rows = [...unique.values()];
+
+    const { getSql } = await import("@/lib/db");
+    const sql = await getSql();
+    const seenModels = new Set<string>();
+    for (const row of rows) {
+      if (!row.designId || seenModels.has(row.designId)) continue;
+      seenModels.add(row.designId);
+      await sql`
+        insert into mp_models (design_id, title)
+        values (${row.designId}, ${row.title})
+        on conflict (design_id) do nothing
+      `;
+    }
+
+    let imported = 0;
+    const chunkSize = 200;
+    for (let offset = 0; offset < rows.length; offset += chunkSize) {
+      const chunk = rows.slice(offset, offset + chunkSize);
+      const params: unknown[] = [];
+      const values = chunk
+        .map((row) => {
+          const base = params.length;
+          params.push(
+            row.takenAt,
+            row.designId,
+            row.likes,
+            row.collections,
+            row.prints,
+            row.downloads,
+            row.comments,
+            row.boosts,
+            row.followers,
+            row.points,
+            row.ratingCount,
+            row.ratingScoreTotal,
+          );
+          const p = (n: number) => `$${base + n}`;
+          return `(${p(1)}::timestamptz, ${p(2)}::text, ${p(3)}::int, ${p(4)}::int, ${p(5)}::int, ${p(6)}::int, ${p(7)}::int, ${p(8)}::int, ${p(9)}::int, ${p(10)}::int, ${p(11)}::int, ${p(12)}::int)`;
+        })
+        .join(", ");
+      const inserted = await sql.query<{ imported: number | string }>(
+        `with inserted as (
+           insert into mp_snapshots (
+             taken_at, design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+             rating_count, rating_score_total
+           )
+           select v.taken_at, nullif(v.design_id, ''), v.likes, v.collections, v.prints, v.downloads,
+                  v.comments, v.boosts, v.followers, v.points, v.rating_count, v.rating_score_total
+           from (values ${values}) as v(
+             taken_at, design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+             rating_count, rating_score_total
+           )
+           where not exists (
+             select 1 from mp_snapshots s
+             where s.taken_at = v.taken_at
+               and s.design_id is not distinct from nullif(v.design_id, '')
+           )
+           returning 1
+         )
+         select count(*)::int as imported from inserted`,
+        params,
+      );
+      imported += Number(inserted[0]?.imported ?? 0);
+    }
+
+    return { imported, skipped: snapshots.length - imported, models: seenModels.size };
+  });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   connectCreator,
   exportCsv,
+  importCsv,
   loadDashboard,
   resetTracking,
   saveSettings,
@@ -40,6 +41,7 @@ function SettingsPage() {
   const [includeModels, setIncludeModels] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!settings) return;
@@ -91,6 +93,16 @@ function SettingsPage() {
       a.click();
       URL.revokeObjectURL(url);
     },
+  });
+  const restore = useMutation({
+    mutationFn: (csvText: string) => importCsv({ data: { csv: csvText } }),
+    onSuccess: (data) => {
+      setStatus(
+        `Imported ${data.imported} snapshots. ${data.skipped} were already stored.`,
+      );
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (err) => setStatus(err instanceof Error ? err.message : "Import failed"),
   });
   const reset = useMutation({
     mutationFn: () => resetTracking(),
@@ -224,12 +236,43 @@ function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-foreground">Export</CardTitle>
+          <CardTitle className="text-foreground">History backup</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Button type="button" variant="secondary" onClick={() => csv.mutate()} disabled={csv.isPending}>
-            Download CSV
-          </Button>
+        <CardContent className="flex max-w-lg flex-col gap-4">
+          <p className="text-sm text-muted-foreground">
+            Download snapshot history as CSV, or import that same file to restore it. Rows that are
+            already stored are skipped. Settings and Telegram are left as they are.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={() => csv.mutate()} disabled={csv.isPending}>
+              Download CSV
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => fileRef.current?.click()}
+              disabled={restore.isPending}
+            >
+              {restore.isPending ? "Importing…" : "Import CSV"}
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const text = typeof reader.result === "string" ? reader.result : "";
+                  if (text.trim()) restore.mutate(text);
+                };
+                reader.readAsText(file);
+              }}
+            />
+          </div>
         </CardContent>
       </Card>
 
