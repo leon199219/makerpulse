@@ -35,6 +35,22 @@ export type MwModel = {
   points: number;
   ratingCount: number;
   ratingScoreTotal: number;
+  profiles: MwPrintProfile[];
+  profilesLoaded: boolean;
+};
+
+export type MwPrintProfile = {
+  profileId: string;
+  designId: string;
+  modelTitle: string;
+  title: string;
+  coverUrl: string;
+  exclusive: boolean;
+  publishedAt: string | null;
+  downloads: number;
+  prints: number;
+  ratingCount: number;
+  ratingScoreTotal: number;
 };
 
 export type MwSnapshot = {
@@ -163,6 +179,8 @@ function mapModel(raw: Json): MwModel {
     points: estimatePoints({ prints, boosts, exclusive }),
     ratingCount: 0,
     ratingScoreTotal: 0,
+    profiles: [],
+    profilesLoaded: false,
   };
 }
 
@@ -194,8 +212,35 @@ export async function fetchPublishedModels(uid: string): Promise<MwModel[]> {
   return models;
 }
 
+function mapProfiles(instances: Json[], model: MwModel, uid: string): MwPrintProfile[] {
+  const profiles: MwPrintProfile[] = [];
+  for (const instance of instances) {
+    const creator = (instance.instanceCreator as Json | undefined) ?? {};
+    const creatorUid = str(creator.uid);
+    if (creatorUid && creatorUid !== uid) continue;
+    const status = num(instance.status);
+    if (status && status !== 1) continue;
+    const profileId = str(instance.id);
+    if (!profileId) continue;
+    profiles.push({
+      profileId,
+      designId: model.designId,
+      modelTitle: model.title,
+      title: str(instance.title) || `Profile ${profileId}`,
+      coverUrl: str(instance.cover),
+      exclusive: model.exclusive,
+      publishedAt: str(instance.createTime || instance.publishTime) || null,
+      downloads: num(instance.downloadCount),
+      prints: num(instance.printCount),
+      ratingCount: num(instance.ratingCount),
+      ratingScoreTotal: num(instance.ratingScoreTotal),
+    });
+  }
+  return profiles;
+}
+
 /** The published-designs list under-reports commentCount and has no star rating. */
-async function enrichModels(models: MwModel[]): Promise<MwModel[]> {
+async function enrichModels(models: MwModel[], uid: string): Promise<MwModel[]> {
   const out = models.slice();
   let cursor = 0;
   const workers = Math.min(4, out.length);
@@ -224,6 +269,8 @@ async function enrichModels(models: MwModel[]): Promise<MwModel[]> {
           comments: "commentCount" in raw ? num(raw.commentCount) : model.comments,
           ratingCount,
           ratingScoreTotal,
+          profiles: mapProfiles(instances, model, uid),
+          profilesLoaded: true,
         };
       } catch {
         // Keep the list values when the model page is briefly unavailable.
@@ -258,7 +305,7 @@ export async function collectSnapshot(uid: string): Promise<MwSnapshot> {
     fetchProfile(uid),
     fetchPublishedModels(uid),
   ]);
-  const models = await enrichModels(listed);
+  const models = await enrichModels(listed, uid);
   const comments = models.reduce((sum, m) => sum + m.comments, 0);
   const modelPrints = models.reduce((sum, m) => sum + m.prints, 0);
   const modelBoosts = models.reduce((sum, m) => sum + m.boosts, 0);

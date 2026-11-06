@@ -9,6 +9,7 @@ Image: `ghcr.io/leon199219/makerpulse:latest`
 ### Added
 
 - Settings can import a MakerPulse snapshot CSV as a history backup. Rows that already exist for the same time are skipped. Settings are not changed.
+- Print profiles from the connected account are tracked separately. Activity has a Print profiles filter. Models and Statistics can switch between models and print profiles, with the same period and column sorting.
 
 ## 2026-10-08
 

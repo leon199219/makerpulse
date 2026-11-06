@@ -21,6 +21,7 @@ function ModelsPage() {
   const [sortKey, setSortKey] = useState<ModelSortKey>("published");
   const [sortDir, setSortDir] = useState<ModelSortDir>("desc");
   const [view, setView] = useState<ModelView>("grid");
+  const [source, setSource] = useState<"models" | "profiles">("models");
   const initial = Route.useLoaderData();
   const dash = useQuery({
     queryKey: ["dashboard", period],
@@ -28,16 +29,16 @@ function ModelsPage() {
     initialData: period === "7d" ? initial : undefined,
   });
   const models = useMemo(() => {
-    const list = dash.data?.models ?? [];
+    const list = source === "profiles" ? (dash.data?.profiles ?? []) : (dash.data?.models ?? []);
     const needle = q.trim().toLowerCase();
     const filtered = needle ? list.filter((m) => m.title.toLowerCase().includes(needle)) : list;
     return sortModels(filtered, sortKey, sortDir, period !== "all");
-  }, [dash.data, q, sortKey, sortDir, period]);
+  }, [dash.data, q, sortKey, sortDir, period, source]);
   const removed = useMemo(() => {
-    const list = dash.data?.removedModels ?? [];
+    const list = source === "profiles" ? (dash.data?.removedProfiles ?? []) : (dash.data?.removedModels ?? []);
     const needle = q.trim().toLowerCase();
     return needle ? list.filter((m) => m.title.toLowerCase().includes(needle)) : list;
-  }, [dash.data, q]);
+  }, [dash.data, q, source]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("mp-models-view");
@@ -68,7 +69,11 @@ function ModelsPage() {
       <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-medium tracking-tight">Models</h1>
-          <p className="text-sm text-muted-foreground">Per-model stats and change over the selected period.</p>
+          <p className="text-sm text-muted-foreground">
+            {source === "profiles"
+              ? "Your print profiles, with the same period sorting as models."
+              : "Per-model stats and change over the selected period."}
+          </p>
         </div>
         <PeriodPicker value={period} onChange={setPeriod} />
       </div>
@@ -80,6 +85,28 @@ function ModelsPage() {
           aria-label="Filter models"
           className="sm:max-w-sm"
         />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setSource("models")}
+            className={cn(
+              "inline-flex h-9 items-center justify-center rounded-full px-3.5 text-xs font-medium",
+              source === "models" ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
+            )}
+          >
+            Models
+          </button>
+          <button
+            type="button"
+            onClick={() => setSource("profiles")}
+            className={cn(
+              "inline-flex h-9 items-center justify-center rounded-full px-3.5 text-xs font-medium",
+              source === "profiles" ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
+            )}
+          >
+            Print profiles
+          </button>
+        </div>
         <div className="flex gap-2">
           <button
             type="button"
@@ -109,7 +136,9 @@ function ModelsPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle className="text-foreground">{models.length} published</CardTitle>
+          <CardTitle className="text-foreground">
+            {models.length} {source === "profiles" ? "print profiles" : "published"}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <ModelTable
@@ -126,11 +155,11 @@ function ModelsPage() {
       {removed.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-foreground">Removed from MakerWorld</CardTitle>
+            <h2 className="text-base font-medium">Removed from MakerWorld</h2>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              These models are no longer published. They stay here with their last recorded stats and are left out of the overview totals.
+              These {source === "profiles" ? "print profiles" : "models"} are no longer published. They stay here with their last recorded stats and are left out of the overview totals.
             </p>
             <ul className="divide-y divide-border">
               {removed.map((model) => (
@@ -146,7 +175,7 @@ function ModelsPage() {
                   )}
                   <Link
                     to="/models/$designId"
-                    params={{ designId: model.designId }}
+                    params={{ designId: model.modelDesignId || model.designId }}
                     className="min-w-0 flex-1 truncate text-sm font-medium hover:text-primary"
                   >
                     {model.title}

@@ -14,12 +14,14 @@ export type ModelRow = {
   deltas: StatBlock;
   rating: RatingBlock;
   ratingDelta: number;
+  modelDesignId?: string | null;
 };
 
 export type EventRow = {
   id: number;
   detectedAt: string;
   designId: string | null;
+  profileId: string | null;
   title: string | null;
   metric: Metric;
   previous: number;
@@ -55,6 +57,8 @@ export type DashboardPayload = {
   series: Record<Metric, SeriesPoint[]>;
   models: ModelRow[];
   removedModels: ModelRow[];
+  profiles: ModelRow[];
+  removedProfiles: ModelRow[];
   events: EventRow[];
   modelCount: number;
 };

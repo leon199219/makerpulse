@@ -22,12 +22,13 @@ export const Route = createFileRoute("/activity")({
 function matchesFilters(event: EventRow, filters: ActivityFilterState): boolean {
   const query = filters.query.trim().toLowerCase();
   if (query) {
-    const hay = `${event.title ?? "Account"} ${event.designId ?? ""}`.toLowerCase();
+    const hay = `${event.title ?? "Account"} ${event.designId ?? ""} ${event.profileId ?? ""}`.toLowerCase();
     if (!hay.includes(query)) return false;
   }
   if (filters.metric !== "all" && event.metric !== filters.metric) return false;
-  if (filters.scope === "account" && event.designId) return false;
-  if (filters.scope === "models" && !event.designId) return false;
+  if (filters.scope === "account" && (event.designId || event.profileId)) return false;
+  if (filters.scope === "models" && (!event.designId || event.profileId)) return false;
+  if (filters.scope === "profiles" && !event.profileId) return false;
   if (filters.direction === "up" && event.delta <= 0) return false;
   if (filters.direction === "down" && event.delta >= 0) return false;
   return true;
@@ -50,7 +51,7 @@ function ActivityPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-medium tracking-tight">Activity</h1>
-          <p className="text-sm text-muted-foreground">Every detected change across the account and each model.</p>
+          <p className="text-sm text-muted-foreground">Changes for the account, each model, and your print profiles.</p>
         </div>
         <PeriodPicker value={period} onChange={setPeriod} />
       </div>

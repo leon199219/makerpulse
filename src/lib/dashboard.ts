@@ -191,14 +191,14 @@ export const loadDashboard = createServerFn({ method: "POST" })
       select distinct on (design_id) design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
         rating_count as count, rating_score_total as score_total
       from mp_snapshots
-      where design_id is not null
+      where design_id is not null and profile_id is null
       order by design_id, taken_at desc
     `;
     const firstModel = await sql<{ design_id: string } & StatBlock & { count: number | string; score_total: number | string }>`
       select distinct on (design_id) design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
         rating_count as count, rating_score_total as score_total
       from mp_snapshots
-      where design_id is not null
+      where design_id is not null and profile_id is null
       order by design_id, taken_at asc
     `;
     const baseModel = startIso
@@ -206,7 +206,7 @@ export const loadDashboard = createServerFn({ method: "POST" })
           select distinct on (design_id) design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
             rating_count as count, rating_score_total as score_total
           from mp_snapshots
-          where design_id is not null and taken_at <= ${startIso}
+          where design_id is not null and profile_id is null and taken_at <= ${startIso}
           order by design_id, taken_at desc
         `
       : [];
@@ -244,51 +244,128 @@ export const loadDashboard = createServerFn({ method: "POST" })
     published.sort((a, b) => b.stats.downloads - a.stats.downloads);
     removed.sort((a, b) => (b.removedAt ?? "").localeCompare(a.removedAt ?? ""));
 
+    const profileMeta = await sql<{
+      profile_id: string;
+      design_id: string;
+      title: string;
+      model_title: string;
+      cover_url: string;
+      is_exclusive: boolean | string;
+      published_at: string | null;
+      removed_at: string | null;
+    }>`select profile_id, design_id, title, model_title, cover_url, is_exclusive, published_at, removed_at from mp_profiles`;
+    const latestProfile = await sql<{ profile_id: string } & StatBlock & { count: number | string; score_total: number | string }>`
+      select distinct on (profile_id) profile_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+        rating_count as count, rating_score_total as score_total
+      from mp_snapshots
+      where profile_id is not null
+      order by profile_id, taken_at desc
+    `;
+    const firstProfile = await sql<{ profile_id: string } & StatBlock & { count: number | string; score_total: number | string }>`
+      select distinct on (profile_id) profile_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+        rating_count as count, rating_score_total as score_total
+      from mp_snapshots
+      where profile_id is not null
+      order by profile_id, taken_at asc
+    `;
+    const baseProfile = startIso
+      ? await sql<{ profile_id: string } & StatBlock & { count: number | string; score_total: number | string }>`
+          select distinct on (profile_id) profile_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+            rating_count as count, rating_score_total as score_total
+          from mp_snapshots
+          where profile_id is not null and taken_at <= ${startIso}
+          order by profile_id, taken_at desc
+        `
+      : [];
+    const latestProfileMap = new Map(latestProfile.map((row) => [row.profile_id, toStats(row)]));
+    const firstProfileMap = new Map(firstProfile.map((row) => [row.profile_id, toStats(row)]));
+    const baseProfileMap = new Map(baseProfile.map((row) => [row.profile_id, toStats(row)]));
+    const latestProfileRating = new Map(
+      latestProfile.map((row) => [row.profile_id, { count: Number(row.count) || 0, scoreTotal: Number(row.score_total) || 0 }]),
+    );
+    const firstProfileRating = new Map(
+      firstProfile.map((row) => [row.profile_id, { count: Number(row.count) || 0, scoreTotal: Number(row.score_total) || 0 }]),
+    );
+    const baseProfileRating = new Map(
+      baseProfile.map((row) => [row.profile_id, { count: Number(row.count) || 0, scoreTotal: Number(row.score_total) || 0 }]),
+    );
+    const publishedProfiles: ModelRow[] = [];
+    const removedProfiles: ModelRow[] = [];
+    for (const meta of profileMeta) {
+      const stats = latestProfileMap.get(meta.profile_id) ?? { ...EMPTY_STATS };
+      const baseline = baseProfileMap.get(meta.profile_id) ?? firstProfileMap.get(meta.profile_id) ?? { ...EMPTY_STATS };
+      const ratingBlock = latestProfileRating.get(meta.profile_id) ?? { ...EMPTY_RATING };
+      const ratingBaseline = baseProfileRating.get(meta.profile_id) ?? firstProfileRating.get(meta.profile_id) ?? { ...EMPTY_RATING };
+      const row: ModelRow = {
+        designId: meta.profile_id,
+        modelDesignId: meta.design_id,
+        title: meta.model_title ? `${meta.model_title} · ${meta.title}` : meta.title,
+        slug: "",
+        coverUrl: meta.cover_url,
+        exclusive: meta.is_exclusive === true || meta.is_exclusive === "t",
+        publishedAt: asIso(meta.published_at),
+        removedAt: asIso(meta.removed_at),
+        stats,
+        deltas: subtract(stats, baseline),
+        rating: ratingBlock,
+        ratingDelta: ratingBlock.count - ratingBaseline.count,
+      };
+      if (row.removedAt) removedProfiles.push(row);
+      else publishedProfiles.push(row);
+    }
+    publishedProfiles.sort((a, b) => b.stats.downloads - a.stats.downloads);
+
+    type EventQueryRow = {
+      id: number;
+      detected_at: string;
+      design_id: string | null;
+      profile_id: string | null;
+      metric: string;
+      previous: number;
+      current: number;
+      delta: number;
+      title: string | null;
+      profile_title: string | null;
+      model_title: string | null;
+    };
     const eventRows = startIso
-      ? await sql<{
-          id: number;
-          detected_at: string;
-          design_id: string | null;
-          metric: string;
-          previous: number;
-          current: number;
-          delta: number;
-          title: string | null;
-        }>`
-          select e.id, e.detected_at, e.design_id, e.metric, e.previous, e.current, e.delta, m.title
+      ? await sql<EventQueryRow>`
+          select e.id, e.detected_at, e.design_id, e.profile_id, e.metric, e.previous, e.current, e.delta,
+                 m.title, p.title as profile_title, p.model_title
           from mp_events e
           left join mp_models m on m.design_id = e.design_id
+          left join mp_profiles p on p.profile_id = e.profile_id
           where e.detected_at >= ${startIso}
           order by e.detected_at desc
-          limit 500
+          limit 800
         `
-      : await sql<{
-          id: number;
-          detected_at: string;
-          design_id: string | null;
-          metric: string;
-          previous: number;
-          current: number;
-          delta: number;
-          title: string | null;
-        }>`
-          select e.id, e.detected_at, e.design_id, e.metric, e.previous, e.current, e.delta, m.title
+      : await sql<EventQueryRow>`
+          select e.id, e.detected_at, e.design_id, e.profile_id, e.metric, e.previous, e.current, e.delta,
+                 m.title, p.title as profile_title, p.model_title
           from mp_events e
           left join mp_models m on m.design_id = e.design_id
+          left join mp_profiles p on p.profile_id = e.profile_id
           order by e.detected_at desc
-          limit 500
+          limit 800
         `;
 
-    const events: EventRow[] = eventRows.map((row) => ({
-      id: Number(row.id),
-      detectedAt: takenIso(row.detected_at),
-      designId: row.design_id,
-      title: row.title,
-      metric: row.metric as Metric,
-      previous: Number(row.previous) || 0,
-      current: Number(row.current) || 0,
-      delta: Number(row.delta) || 0,
-    }));
+    const events: EventRow[] = eventRows.map((row) => {
+      const modelTitle = row.model_title || row.title;
+      const title = row.profile_id
+        ? [modelTitle, row.profile_title].filter(Boolean).join(" · ")
+        : row.title;
+      return {
+        id: Number(row.id),
+        detectedAt: takenIso(row.detected_at),
+        designId: row.profile_id ? null : row.design_id,
+        profileId: row.profile_id,
+        title: title || null,
+        metric: row.metric as Metric,
+        previous: Number(row.previous) || 0,
+        current: Number(row.current) || 0,
+        delta: Number(row.delta) || 0,
+      };
+    });
 
     return {
       settings,
@@ -301,6 +378,8 @@ export const loadDashboard = createServerFn({ method: "POST" })
       series,
       models: published,
       removedModels: removed,
+      profiles: publishedProfiles,
+      removedProfiles,
       events,
       modelCount: published.length,
     };
@@ -330,14 +409,14 @@ export const loadModel = createServerFn({ method: "POST" })
           select taken_at, likes, collections, prints, downloads, comments, boosts, followers, points,
                  rating_count, rating_score_total
           from mp_snapshots
-          where design_id = ${data.designId} and taken_at >= ${startIso}
+          where design_id = ${data.designId} and profile_id is null and taken_at >= ${startIso}
           order by taken_at asc
         `
       : await sql<{ taken_at: string } & StatBlock>`
           select taken_at, likes, collections, prints, downloads, comments, boosts, followers, points,
                  rating_count, rating_score_total
           from mp_snapshots
-          where design_id = ${data.designId}
+          where design_id = ${data.designId} and profile_id is null
           order by taken_at asc
         `;
     const series = {} as Record<Metric, SeriesPoint[]>;
@@ -353,7 +432,7 @@ export const loadModel = createServerFn({ method: "POST" })
     const boundary = startIso
       ? await sql`
           select * from mp_snapshots
-          where design_id = ${data.designId} and taken_at <= ${startIso}
+          where design_id = ${data.designId} and profile_id is null and taken_at <= ${startIso}
           order by taken_at desc
           limit 1
         `
@@ -364,7 +443,7 @@ export const loadModel = createServerFn({ method: "POST" })
     const prevRows = prevStart
       ? await sql`
           select * from mp_snapshots
-          where design_id = ${data.designId} and taken_at <= ${prevStart.toISOString()}
+          where design_id = ${data.designId} and profile_id is null and taken_at <= ${prevStart.toISOString()}
           order by taken_at desc
           limit 1
         `
@@ -483,20 +562,27 @@ export const exportCsv = createServerFn({ method: "POST" }).handler(async () => 
     points: number;
     rating_count: number;
     rating_score_total: number;
+    profile_id: string | null;
+    model_title: string | null;
   }>`
-    select s.taken_at, s.design_id, m.title, s.likes, s.collections, s.prints, s.downloads,
+    select s.taken_at, s.design_id, s.profile_id, p.model_title,
+           case when s.profile_id is not null then p.title else m.title end as title,
+           s.likes, s.collections, s.prints, s.downloads,
            s.comments, s.boosts, s.followers, s.points, s.rating_count, s.rating_score_total
     from mp_snapshots s
-    left join mp_models m on m.design_id = s.design_id
+    left join mp_models m on m.design_id = s.design_id and s.profile_id is null
+    left join mp_profiles p on p.profile_id = s.profile_id
     order by s.taken_at asc
   `;
   const header =
-    "taken_at,scope,design_id,title,likes,collections,prints,downloads,comments,boosts,followers,points,rating_count,rating_score_total";
+    "taken_at,scope,design_id,title,likes,collections,prints,downloads,comments,boosts,followers,points,rating_count,rating_score_total,profile_id,model_title";
   const lines = rows.map((row) => {
     const title = (row.title ?? "Account").replaceAll('"', '""');
+    const modelTitle = (row.model_title ?? "").replaceAll('"', '""');
+    const scope = row.profile_id ? "profile" : row.design_id ? "model" : "account";
     return [
       takenIso(row.taken_at),
-      row.design_id ? "model" : "account",
+      scope,
       row.design_id ?? "",
       `"${title}"`,
       row.likes,
@@ -509,6 +595,8 @@ export const exportCsv = createServerFn({ method: "POST" }).handler(async () => 
       row.points,
       row.rating_count,
       row.rating_score_total,
+      row.profile_id ?? "",
+      `"${modelTitle}"`,
     ].join(",");
   });
   return { csv: [header, ...lines].join("\n") };
@@ -581,6 +669,8 @@ export const importCsv = createServerFn({ method: "POST" })
       if (!index.has(column)) throw new Error("This file is not a MakerPulse snapshot export.");
     }
     const cell = (cells: string[], name: string) => cells[index.get(name) ?? -1] ?? "";
+    const profileCol = index.has("profile_id");
+    const modelTitleCol = index.has("model_title");
     const ratingCountCol = index.has("rating_count");
     const ratingScoreCol = index.has("rating_score_total");
     type SnapshotInsert = {
@@ -597,6 +687,8 @@ export const importCsv = createServerFn({ method: "POST" })
       points: number;
       ratingCount: number;
       ratingScoreTotal: number;
+      profileId: string | null;
+      modelTitle: string;
     };
     const snapshots: SnapshotInsert[] = [];
     for (let i = 1; i < table.length; i += 1) {
@@ -607,10 +699,14 @@ export const importCsv = createServerFn({ method: "POST" })
       }
       const scope = cell(cells, "scope").trim();
       const designId = cell(cells, "design_id").trim();
-      if (scope !== "account" && scope !== "model") {
+      const profileId = profileCol ? cell(cells, "profile_id").trim() : "";
+      if (scope !== "account" && scope !== "model" && scope !== "profile") {
         throw new Error(`Row ${i + 1} has an unknown scope.`);
       }
-      if (scope === "model" && !designId) throw new Error(`Row ${i + 1} is a model without a design id.`);
+      if ((scope === "model" || scope === "profile") && !designId) {
+        throw new Error(`Row ${i + 1} is missing a design id.`);
+      }
+      if (scope === "profile" && !profileId) throw new Error(`Row ${i + 1} is a print profile without an id.`);
       const title = cell(cells, "title").trim() || (designId ? `Model ${designId}` : "Account");
       snapshots.push({
         takenAt: new Date(takenAt).toISOString(),
@@ -626,17 +722,30 @@ export const importCsv = createServerFn({ method: "POST" })
         points: csvInt(cell(cells, "points")),
         ratingCount: ratingCountCol ? csvInt(cell(cells, "rating_count")) : 0,
         ratingScoreTotal: ratingScoreCol ? csvInt(cell(cells, "rating_score_total")) : 0,
+        profileId: profileId || null,
+        modelTitle: modelTitleCol ? cell(cells, "model_title").trim() : "",
       });
     }
     if (snapshots.length === 0) throw new Error("The CSV has no snapshot rows.");
     const unique = new Map<string, (typeof snapshots)[number]>();
-    for (const row of snapshots) unique.set(`${row.takenAt}\0${row.designId ?? ""}`, row);
+    for (const row of snapshots) unique.set(`${row.takenAt}\0${row.designId ?? ""}\0${row.profileId ?? ""}`, row);
     const rows = [...unique.values()];
 
     const { getSql } = await import("@/lib/db");
     const sql = await getSql();
     const seenModels = new Set<string>();
+    const seenProfiles = new Set<string>();
     for (const row of rows) {
+      if (row.profileId) {
+        if (seenProfiles.has(row.profileId) || !row.designId) continue;
+        seenProfiles.add(row.profileId);
+        await sql`
+          insert into mp_profiles (profile_id, design_id, title, model_title)
+          values (${row.profileId}, ${row.designId}, ${row.title}, ${row.modelTitle})
+          on conflict (profile_id) do nothing
+        `;
+        continue;
+      }
       if (!row.designId || seenModels.has(row.designId)) continue;
       seenModels.add(row.designId);
       await sql`
@@ -657,6 +766,7 @@ export const importCsv = createServerFn({ method: "POST" })
           params.push(
             row.takenAt,
             row.designId,
+            row.profileId,
             row.likes,
             row.collections,
             row.prints,
@@ -669,25 +779,26 @@ export const importCsv = createServerFn({ method: "POST" })
             row.ratingScoreTotal,
           );
           const p = (n: number) => `$${base + n}`;
-          return `(${p(1)}::timestamptz, ${p(2)}::text, ${p(3)}::int, ${p(4)}::int, ${p(5)}::int, ${p(6)}::int, ${p(7)}::int, ${p(8)}::int, ${p(9)}::int, ${p(10)}::int, ${p(11)}::int, ${p(12)}::int)`;
+          return `(${p(1)}::timestamptz, ${p(2)}::text, ${p(3)}::text, ${p(4)}::int, ${p(5)}::int, ${p(6)}::int, ${p(7)}::int, ${p(8)}::int, ${p(9)}::int, ${p(10)}::int, ${p(11)}::int, ${p(12)}::int, ${p(13)}::int)`;
         })
         .join(", ");
       const inserted = await sql.query<{ imported: number | string }>(
         `with inserted as (
            insert into mp_snapshots (
-             taken_at, design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+             taken_at, design_id, profile_id, likes, collections, prints, downloads, comments, boosts, followers, points,
              rating_count, rating_score_total
            )
-           select v.taken_at, nullif(v.design_id, ''), v.likes, v.collections, v.prints, v.downloads,
+           select v.taken_at, nullif(v.design_id, ''), nullif(v.profile_id, ''), v.likes, v.collections, v.prints, v.downloads,
                   v.comments, v.boosts, v.followers, v.points, v.rating_count, v.rating_score_total
            from (values ${values}) as v(
-             taken_at, design_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+             taken_at, design_id, profile_id, likes, collections, prints, downloads, comments, boosts, followers, points,
              rating_count, rating_score_total
            )
            where not exists (
              select 1 from mp_snapshots s
              where s.taken_at = v.taken_at
                and s.design_id is not distinct from nullif(v.design_id, '')
+               and s.profile_id is not distinct from nullif(v.profile_id, '')
            )
            returning 1
          )

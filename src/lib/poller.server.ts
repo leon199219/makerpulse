@@ -5,7 +5,7 @@ import {
   resolveCreator,
   type MwSnapshot,
 } from "@/lib/makerworld.server";
-import { EMPTY_STATS, METRICS, MILESTONE_STEPS, MODEL_METRICS, type Metric, type RatingBlock, type StatBlock } from "@/lib/metrics";
+import { EMPTY_STATS, METRICS, MILESTONE_STEPS, MODEL_METRICS, estimatePoints, type Metric, type RatingBlock, type StatBlock } from "@/lib/metrics";
 import {
   formatChangeDigest,
   formatMilestones,
@@ -38,6 +38,7 @@ type SnapshotRow = StatBlock & {
   id: number;
   taken_at: string;
   design_id: string | null;
+  profile_id?: string | null;
 };
 
 const g = globalThis as typeof globalThis & {
@@ -101,7 +102,7 @@ async function latestSnapshot(designId: string | null): Promise<SnapshotRow | nu
   if (designId == null) {
     const rows = await sql<SnapshotRow>`
       select * from mp_snapshots
-      where design_id is null
+      where design_id is null and profile_id is null
       order by taken_at desc
       limit 1
     `;
@@ -109,7 +110,7 @@ async function latestSnapshot(designId: string | null): Promise<SnapshotRow | nu
   }
   const rows = await sql<SnapshotRow>`
     select * from mp_snapshots
-    where design_id = ${designId}
+    where design_id = ${designId} and profile_id is null
     order by taken_at desc
     limit 1
   `;
@@ -180,6 +181,7 @@ async function recordEvents(
   previous: StatBlock,
   next: StatBlock,
   metrics: readonly Metric[],
+  profileId: string | null = null,
 ): Promise<TelegramEvent[]> {
   const sql = await getSql();
   const events: TelegramEvent[] = [];
@@ -187,8 +189,8 @@ async function recordEvents(
     const delta = next[metric] - previous[metric];
     if (delta === 0) continue;
     await sql`
-      insert into mp_events (design_id, metric, previous, current, delta)
-      values (${designId}, ${metric}, ${previous[metric]}, ${next[metric]}, ${delta})
+      insert into mp_events (design_id, profile_id, metric, previous, current, delta)
+      values (${designId}, ${profileId}, ${metric}, ${previous[metric]}, ${next[metric]}, ${delta})
     `;
     events.push({
       designTitle: null,
@@ -232,7 +234,7 @@ async function baselinesForWindow(at: Date): Promise<Map<string, SnapshotRow>> {
   const before = await sql<SnapshotRow>`
     select distinct on (design_id) *
     from mp_snapshots
-    where taken_at <= ${at.toISOString()}
+    where taken_at <= ${at.toISOString()} and profile_id is null
     order by design_id nulls first, taken_at desc
   `;
   const map = new Map<string, SnapshotRow>();
@@ -240,6 +242,7 @@ async function baselinesForWindow(at: Date): Promise<Map<string, SnapshotRow>> {
   const earliest = await sql<SnapshotRow>`
     select distinct on (design_id) *
     from mp_snapshots
+    where profile_id is null
     order by design_id nulls first, taken_at asc
   `;
   for (const row of earliest) {
@@ -437,6 +440,82 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
       }
     }
 
+    const seenProfiles = new Set<string>();
+    const loadedDesigns = new Set(
+      snapshot.models.filter((model) => model.profilesLoaded).map((model) => model.designId),
+    );
+    for (const model of snapshot.models) {
+      if (!model.profilesLoaded) continue;
+      for (const profile of model.profiles) {
+        seenProfiles.add(profile.profileId);
+        await sql`
+          insert into mp_profiles (
+            profile_id, design_id, title, model_title, cover_url, is_exclusive, published_at, last_seen_at
+          ) values (
+            ${profile.profileId}, ${profile.designId}, ${profile.title}, ${profile.modelTitle},
+            ${profile.coverUrl}, ${profile.exclusive}, ${profile.publishedAt}, now()
+          )
+          on conflict (profile_id) do update set
+            design_id = excluded.design_id,
+            title = excluded.title,
+            model_title = excluded.model_title,
+            cover_url = excluded.cover_url,
+            is_exclusive = excluded.is_exclusive,
+            published_at = coalesce(excluded.published_at, mp_profiles.published_at),
+            last_seen_at = now(),
+            removed_at = null
+        `;
+        const stats: StatBlock = {
+          likes: 0,
+          collections: 0,
+          prints: profile.prints,
+          downloads: profile.downloads,
+          comments: 0,
+          boosts: 0,
+          followers: 0,
+          points: estimatePoints({ prints: profile.prints, boosts: 0, exclusive: profile.exclusive }),
+        };
+        const rating: RatingBlock = {
+          count: profile.ratingCount,
+          scoreTotal: profile.ratingScoreTotal,
+        };
+        const prevProfile = await sql<SnapshotRow>`
+          select * from mp_snapshots
+          where profile_id = ${profile.profileId}
+          order by taken_at desc
+          limit 1
+        `;
+        await sql`
+          insert into mp_snapshots (
+            design_id, profile_id, likes, collections, prints, downloads, comments, boosts, followers, points,
+            rating_count, rating_score_total
+          ) values (
+            ${profile.designId}, ${profile.profileId}, ${stats.likes}, ${stats.collections}, ${stats.prints},
+            ${stats.downloads}, ${stats.comments}, ${stats.boosts}, ${stats.followers}, ${stats.points},
+            ${rating.count}, ${rating.scoreTotal}
+          )
+        `;
+        const prevRow = prevProfile[0] ?? null;
+        if (!prevRow) continue;
+        await recordEvents(
+          profile.designId,
+          rowStats(prevRow),
+          stats,
+          ["prints", "downloads", "points"],
+          profile.profileId,
+        );
+      }
+    }
+    if (loadedDesigns.size > 0) {
+      const storedProfiles = await sql<{ profile_id: string; design_id: string }>`
+        select profile_id, design_id from mp_profiles where removed_at is null
+      `;
+      for (const row of storedProfiles) {
+        if (!loadedDesigns.has(row.design_id) || seenProfiles.has(row.profile_id)) continue;
+        await sql`update mp_profiles set removed_at = now() where profile_id = ${row.profile_id}`;
+      }
+    }
+
     await maybeTelegram(settings, snapshot, allEvents, milestones);
     return { ok: true, events: allEvents.length };
   } catch (err) {
@@ -472,6 +551,7 @@ export async function clearHistory(): Promise<void> {
   const sql = await getSql();
   await sql`delete from mp_events`;
   await sql`delete from mp_snapshots`;
+  await sql`delete from mp_profiles`;
   await sql`delete from mp_models`;
   await sql`delete from mp_milestones`;
   await sql`

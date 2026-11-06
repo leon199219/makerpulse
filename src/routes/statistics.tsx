@@ -53,12 +53,16 @@ function StatisticsPage() {
   });
   const [sortKey, setSortKey] = useState<SortKey>("downloads");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [source, setSource] = useState<"models" | "profiles">("models");
 
   const published = useMemo(() => {
-    const list = dash.data?.models ?? [];
+    const list = source === "profiles" ? (dash.data?.profiles ?? []) : (dash.data?.models ?? []);
     return sortModels(list, sortKey, sortDir);
-  }, [dash.data, sortKey, sortDir]);
-  const removed = useMemo(() => dash.data?.removedModels ?? [], [dash.data]);
+  }, [dash.data, sortKey, sortDir, source]);
+  const removed = useMemo(
+    () => (source === "profiles" ? (dash.data?.removedProfiles ?? []) : (dash.data?.removedModels ?? [])),
+    [dash.data, source],
+  );
 
   function sortBy(key: ColumnKey) {
     if (sortKey === key) {
@@ -84,9 +88,31 @@ function StatisticsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-medium tracking-tight">Statistics</h1>
-          <p className="text-sm text-muted-foreground">Current totals for every model.</p>
+          <p className="text-sm text-muted-foreground">
+            Current totals for every {source === "profiles" ? "print profile" : "model"}.
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSource("models")}
+            className={cn(
+              "inline-flex h-9 items-center justify-center rounded-full px-3.5 text-xs font-medium",
+              source === "models" ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
+            )}
+          >
+            Models
+          </button>
+          <button
+            type="button"
+            onClick={() => setSource("profiles")}
+            className={cn(
+              "inline-flex h-9 items-center justify-center rounded-full px-3.5 text-xs font-medium",
+              source === "profiles" ? "bg-foreground text-background" : "bg-secondary text-foreground/85 hover:bg-accent",
+            )}
+          >
+            Print profiles
+          </button>
           <button
             type="button"
             onClick={() => sortByPublished("desc")}
@@ -116,7 +142,11 @@ function StatisticsPage() {
       <Card>
         <CardContent className="p-0 sm:p-2">
           {published.length === 0 ? (
-            <p className="px-4 py-8 text-sm text-muted-foreground">Models appear after the first successful sync.</p>
+            <p className="px-4 py-8 text-sm text-muted-foreground">
+              {source === "profiles"
+                ? "Print profiles appear after the next sync."
+                : "Models appear after the first successful sync."}
+            </p>
           ) : (
             <div className="w-full overflow-x-auto">
               <table className="w-full min-w-[880px] text-left text-sm">
@@ -178,7 +208,7 @@ function StatisticsPage() {
                 <li key={model.designId}>
                   <Link
                     to="/models/$designId"
-                    params={{ designId: model.designId }}
+                    params={{ designId: model.modelDesignId || model.designId }}
                     className="flex items-center gap-3 py-3 hover:text-primary"
                   >
                     {model.coverUrl ? (
@@ -204,7 +234,7 @@ function Row({ model, showDate }: { model: ModelRow; showDate: boolean }) {
       <td className="px-4 py-3">
         <Link
           to="/models/$designId"
-          params={{ designId: model.designId }}
+          params={{ designId: model.modelDesignId || model.designId }}
           className="flex items-center gap-3 hover:text-primary"
         >
           {model.coverUrl ? (

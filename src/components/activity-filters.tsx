@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-export type ActivityScope = "all" | "account" | "models";
+export type ActivityScope = "all" | "account" | "models" | "profiles";
 export type ActivityDirection = "all" | "up" | "down";
 
 export type ActivityFilterState = {
@@ -25,6 +25,7 @@ const SCOPES: { key: ActivityScope; label: string }[] = [
   { key: "all", label: "All" },
   { key: "account", label: "Account" },
   { key: "models", label: "Models" },
+  { key: "profiles", label: "Print profiles" },
 ];
 
 const DIRECTIONS: { key: ActivityDirection; label: string }[] = [

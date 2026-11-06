@@ -129,7 +129,7 @@ export function ModelTable({
               <li key={model.designId}>
                 <Link
                   to="/models/$designId"
-                  params={{ designId: model.designId }}
+                  params={{ designId: model.modelDesignId || model.designId }}
                   className="flex items-center gap-3 py-3 hover:text-primary"
                 >
                   {model.coverUrl ? (
@@ -185,7 +185,7 @@ export function ModelTable({
             <Link
               key={model.designId}
               to="/models/$designId"
-              params={{ designId: model.designId }}
+              params={{ designId: model.modelDesignId || model.designId }}
               className="group min-w-0"
             >
               <div className="relative overflow-hidden rounded-xl bg-secondary">
