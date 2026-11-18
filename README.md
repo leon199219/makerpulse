@@ -37,7 +37,7 @@ Not affiliated with Bambu Lab or MakerWorld. Points are **estimated** from publi
 
 Want the same stats on a desk display? **[MakerPulse-CYD](https://github.com/leon199219/MakerPulse-CYD)** runs on a Cheap Yellow Display ([ESP32-2432S028](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display)): Telegram on change, MQTT backlight for Home Assistant. No Docker on the ESP — it talks to MakerWorld itself.
 
-[![MakerPulse on the CYD](https://raw.githubusercontent.com/leon199219/MakerPulse-CYD/main/docs/cyd.png)](https://github.com/leon199219/MakerPulse-CYD)
+[![MakerPulse on the CYD](https://raw.githubusercontent.com/leon199219/MakerPulse-CYD/main/docs/photo-1.svg)](https://github.com/leon199219/MakerPulse-CYD)
 
 The dashboard and the CYD are independent. Run one, the other, or both.
 
@@ -137,10 +137,15 @@ More detail (source build, reverse proxy, troubleshooting): [INSTALL.md](INSTALL
 
 ## Environment
 
+A list of every variable, with dummy values, is in [`.env.example`](.env.example). Copy it to `.env`. That file is gitignored. See [SECURITY.md](SECURITY.md).
+
+Change the default database password `makerpulse:makerpulse` before you use this outside a local demo.
+
 | Variable | Required | Description |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Postgres URL (`user:pass@service:5432/db`) |
 | `MAKERWORLD_UID` | No | Numeric MakerWorld user ID (or set in Settings) |
+| `MAKERWORLD_HANDLE` | No | Optional MakerWorld handle (or set in Settings) |
 | `POLL_INTERVAL_MINUTES` | No | Starting value only (`30`). After you save Settings, the app uses that interval |
 | `TELEGRAM_BOT_TOKEN` | No | From [@BotFather](https://t.me/BotFather) |
 | `TELEGRAM_CHAT_ID` | No | Chat or group ID |
@@ -194,5 +199,7 @@ Or `docker build -t makerpulse:local .` and point Compose at that tag.
 ## License
 
 [MIT](LICENSE)
+
+See [SECURITY.md](SECURITY.md) for what not to publish.
 
 MakerWorld and Bambu Lab are trademarks of their respective owners.
