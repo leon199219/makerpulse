@@ -24,6 +24,7 @@ Self-hosted **MakerWorld** creator analytics. Track likes, collections, prints, 
 - Totals **and** per-model history
 - Period picker: `1h`, `4h`, `8h`, `24h`, `7D`, `30D`, `90D`, `ALL`
 - Activity feed with type filters
+- Follower log: who started or stopped following, timed to the sync that first saw them (`/followers`)
 - Optional **Telegram** bot (hourly / 6h / daily / weekly)
 - JSON API for Home Assistant / Grafana (`GET /api/stats`)
 - Reset tracking data from Settings

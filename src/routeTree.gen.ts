@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ActivityRouteImport } from './routes/activity'
+import { Route as FollowersRouteImport } from './routes/followers'
 import { Route as ModelsRouteImport } from './routes/models'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StatisticsRouteImport } from './routes/statistics'
@@ -28,6 +29,11 @@ const IndexRoute = IndexRouteImport.update({
 const ActivityRoute = ActivityRouteImport.update({
   id: '/activity',
   path: '/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FollowersRoute = FollowersRouteImport.update({
+  id: '/followers',
+  path: '/followers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ModelsRoute = ModelsRouteImport.update({
@@ -74,6 +80,7 @@ const ModelsDesignIdRoute = ModelsDesignIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/followers': typeof FollowersRoute
   '/models': typeof ModelsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/statistics': typeof StatisticsRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/followers': typeof FollowersRoute
   '/settings': typeof SettingsRoute
   '/statistics': typeof StatisticsRoute
   '/api/cron': typeof ApiCronRoute
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/activity': typeof ActivityRoute
+  '/followers': typeof FollowersRoute
   '/models': typeof ModelsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/statistics': typeof StatisticsRoute
@@ -112,6 +121,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activity'
+    | '/followers'
     | '/models'
     | '/settings'
     | '/statistics'
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/activity'
+    | '/followers'
     | '/settings'
     | '/statistics'
     | '/api/cron'
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/activity'
+    | '/followers'
     | '/models'
     | '/settings'
     | '/statistics'
@@ -148,6 +160,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivityRoute: typeof ActivityRoute
+  FollowersRoute: typeof FollowersRoute
   ModelsRoute: typeof ModelsRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   StatisticsRoute: typeof StatisticsRoute
@@ -170,6 +183,13 @@ declare module '@tanstack/react-router' {
       path: '/activity'
       fullPath: '/activity'
       preLoaderRoute: typeof ActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/followers': {
+      id: '/followers'
+      path: '/followers'
+      fullPath: '/followers'
+      preLoaderRoute: typeof FollowersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/models': {
@@ -247,6 +267,7 @@ const ModelsRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivityRoute: ActivityRoute,
+  FollowersRoute: FollowersRoute,
   ModelsRoute: ModelsRouteWithChildren,
   SettingsRoute: SettingsRoute,
   StatisticsRoute: StatisticsRoute,

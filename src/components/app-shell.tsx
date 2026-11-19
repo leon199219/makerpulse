@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Activity, LayoutDashboard, Settings2, Boxes, Table2 } from "lucide-react";
+import { Activity, LayoutDashboard, Settings2, Boxes, Table2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -8,6 +8,7 @@ const NAV = [
   { to: "/models", label: "Models", icon: Boxes },
   { to: "/statistics", label: "Statistics", icon: Table2 },
   { to: "/activity", label: "Activity", icon: Activity },
+  { to: "/followers", label: "Followers", icon: Users },
   { to: "/settings", label: "Settings", icon: Settings2 },
 ] as const;
 
@@ -32,7 +33,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
             <span className="text-base font-semibold tracking-tight">MakerPulse</span>
           </Link>
-          <nav className="hidden items-center gap-2 sm:flex">
+          <nav className="hidden max-w-[680px] flex-wrap items-center justify-end gap-2 sm:flex">
             {NAV.map((item) => {
               const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
               return (
@@ -57,7 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {children}
       </div>
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background/95 backdrop-blur sm:hidden">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {NAV.map((item) => {
             const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
@@ -66,7 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] font-medium",
+                  "flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-center text-[10px] font-medium leading-tight",
                   active ? "text-primary" : "text-muted-foreground",
                 )}
               >

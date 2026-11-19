@@ -16,6 +16,15 @@ export const Route = createFileRoute("/api/stats")({
           deltas_24h: payload.deltas,
           model_count: payload.modelCount,
           last_poll_at: payload.settings.lastPollAt,
+          recent_followers: payload.events
+            .filter((event) => event.followerAction)
+            .slice(0, 20)
+            .map((event) => ({
+              name: event.title,
+              handle: event.followerHandle,
+              action: event.followerAction,
+              at: event.detectedAt,
+            })),
         });
       },
     },

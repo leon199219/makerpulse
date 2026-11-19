@@ -28,10 +28,16 @@ export function ActivityList({
         >
           <div className="min-w-0">
             <p className={cn("truncate font-medium", large ? "text-base" : "text-sm")}>
-              {event.title ?? "Account"} · {METRIC_LABELS[event.metric]}
+              {event.followerAction
+                ? event.title
+                : `${event.title ?? "Account"} · ${METRIC_LABELS[event.metric]}`}
             </p>
             <p className={cn("mt-1 text-muted-foreground", large ? "text-sm" : "text-xs")}>
-              {formatExact(event.previous)} → {formatExact(event.current)} ·{" "}
+              {event.followerAction
+                ? `${event.followerAction === "follow" ? "Started following" : "Stopped following"}${
+                    event.followerHandle ? ` · @${event.followerHandle}` : ""
+                  } · `
+                : `${formatExact(event.previous)} → ${formatExact(event.current)} · `}
               {formatDistanceToNow(asDate(event.detectedAt), { addSuffix: true })}
             </p>
           </div>

@@ -1,5 +1,6 @@
 import { getSql } from "@/lib/db";
 import { env } from "@/lib/env.server";
+import { syncFollowers, type FollowerChange } from "@/lib/followers.server";
 import {
   collectSnapshot,
   resolveCreator,
@@ -13,6 +14,7 @@ import {
   sendTelegramMessage,
   type MilestoneHit,
   type TelegramEvent,
+  type TelegramFollowerChange,
 } from "@/lib/telegram.server";
 
 export type SettingsRow = {
@@ -252,11 +254,20 @@ async function baselinesForWindow(at: Date): Promise<Map<string, SnapshotRow>> {
   return map;
 }
 
+function toTelegramFollowers(changes: FollowerChange[]): TelegramFollowerChange[] {
+  return changes.map((change) => ({
+    name: change.name,
+    handle: change.handle,
+    action: change.action,
+  }));
+}
+
 async function maybeTelegram(
   settings: SettingsRow,
   snapshot: MwSnapshot,
   events: TelegramEvent[],
   milestones: MilestoneHit[],
+  followerChanges: FollowerChange[],
 ): Promise<void> {
   if (!settings.telegram_enabled || !settings.telegram_bot_token || !settings.telegram_chat_id) {
     return;
@@ -281,12 +292,13 @@ async function maybeTelegram(
     );
   }
 
-  if (settings.telegram_on_change && events.length) {
+  if (settings.telegram_on_change && (events.length || followerChanges.length)) {
     const html = formatChangeDigest({
       creatorName: snapshot.profile.name,
       handle: snapshot.profile.handle,
       events,
       includeModels: settings.telegram_include_models,
+      followerChanges: toTelegramFollowers(followerChanges),
     });
     await sendTelegramMessage(settings.telegram_bot_token, settings.telegram_chat_id, html);
   }
@@ -331,6 +343,14 @@ async function maybeTelegram(
     });
   }
 
+  const namedRows = await sql<{ name: string; handle: string; action: "follow" | "unfollow" }>`
+    select name, handle, action
+    from mp_follower_events
+    where detected_at >= ${windowStart.toISOString()}
+    order by detected_at desc
+    limit 40
+  `;
+
   const html = formatPeriodicSummary({
     creatorName: snapshot.profile.name,
     handle: snapshot.profile.handle,
@@ -339,6 +359,11 @@ async function maybeTelegram(
     modelCount: snapshot.models.length,
     windowLabel: cadenceWindowLabel(settings.telegram_cadence),
     modelChanges,
+    followerChanges: namedRows.map((row) => ({
+      name: row.name,
+      handle: row.handle,
+      action: row.action,
+    })),
   });
   await sendTelegramMessage(settings.telegram_bot_token, settings.telegram_chat_id, html);
   await sql`update mp_settings set last_telegram_at = now() where id = 1`;
@@ -516,7 +541,15 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
       }
     }
 
-    await maybeTelegram(settings, snapshot, allEvents, milestones);
+    let followerChanges: FollowerChange[] = [];
+    try {
+      const synced = await syncFollowers(settings.creator_uid, snapshot.profile.followers);
+      followerChanges = synced.changes;
+    } catch (err) {
+      console.error("[makerpulse] follower sync failed", err);
+    }
+
+    await maybeTelegram(settings, snapshot, allEvents, milestones, followerChanges);
     return { ok: true, events: allEvents.length };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -550,6 +583,9 @@ export async function ensurePoller(): Promise<void> {
 export async function clearHistory(): Promise<void> {
   const sql = await getSql();
   await sql`delete from mp_events`;
+  await sql`delete from mp_follower_events`;
+  await sql`delete from mp_followers`;
+  await sql`delete from mp_follower_sync`;
   await sql`delete from mp_snapshots`;
   await sql`delete from mp_profiles`;
   await sql`delete from mp_models`;

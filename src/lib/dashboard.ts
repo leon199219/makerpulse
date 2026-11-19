@@ -5,12 +5,14 @@ import { asIso } from "@/lib/utils";
 import type {
   DashboardPayload,
   EventRow,
+  FollowerPage,
+  FollowerView,
   ModelRow,
   PublicSettings,
   SeriesPoint,
 } from "@/lib/dashboard-types";
 
-export type { DashboardPayload, EventRow, ModelRow, PublicSettings, SeriesPoint };
+export type { DashboardPayload, EventRow, FollowerPage, ModelRow, PublicSettings, SeriesPoint };
 
 type SettingsRow = {
   creator_uid: string;
@@ -364,8 +366,53 @@ export const loadDashboard = createServerFn({ method: "POST" })
         previous: Number(row.previous) || 0,
         current: Number(row.current) || 0,
         delta: Number(row.delta) || 0,
+        followerUid: null,
+        followerHandle: null,
+        followerAction: null,
       };
     });
+
+    type FollowerEventQueryRow = {
+      id: number | string;
+      detected_at: string;
+      uid: string;
+      name: string;
+      handle: string;
+      action: string;
+    };
+    const followerEventRows = startIso
+      ? await sql<FollowerEventQueryRow>`
+          select id, detected_at, uid, name, handle, action
+          from mp_follower_events
+          where detected_at >= ${startIso}
+          order by detected_at desc
+          limit 400
+        `
+      : await sql<FollowerEventQueryRow>`
+          select id, detected_at, uid, name, handle, action
+          from mp_follower_events
+          order by detected_at desc
+          limit 400
+        `;
+    for (const row of followerEventRows) {
+      const action = row.action === "unfollow" ? "unfollow" : "follow";
+      events.push({
+        id: -Math.abs(Number(row.id) || 0),
+        detectedAt: takenIso(row.detected_at),
+        designId: null,
+        profileId: null,
+        title: row.name || row.handle || "Follower",
+        metric: "followers",
+        previous: action === "follow" ? 0 : 1,
+        current: action === "follow" ? 1 : 0,
+        delta: action === "follow" ? 1 : -1,
+        followerUid: row.uid,
+        followerHandle: row.handle || null,
+        followerAction: action,
+      });
+    }
+    events.sort((a, b) => (a.detectedAt < b.detectedAt ? 1 : a.detectedAt > b.detectedAt ? -1 : 0));
+    if (events.length > 800) events.length = 800;
 
     return {
       settings,
@@ -810,3 +857,94 @@ export const importCsv = createServerFn({ method: "POST" })
 
     return { imported, skipped: snapshots.length - imported, models: seenModels.size };
   });
+
+function flag(value: unknown): boolean {
+  return value === true || value === "t" || value === "true" || value === 1 || value === "1";
+}
+
+export const loadFollowers = createServerFn({ method: "POST" })
+  .validator((d: unknown) =>
+    z.object({ view: z.enum(["changes", "following", "lost"]).default("changes") }).parse(d ?? {}),
+  )
+  .handler(async ({ data }): Promise<FollowerPage> => {
+    const { ensurePoller } = await import("@/lib/poller.server");
+    const { getSql } = await import("@/lib/db");
+    await ensurePoller();
+    const sql = await getSql();
+    const view: FollowerView = data.view;
+    const syncRows = await sql<{
+      scanned_at: string | null;
+      total_reported: number | string;
+      complete: boolean | string;
+      note: string;
+    }>`select scanned_at, total_reported, complete, note from mp_follower_sync where id = 1`;
+    const counts = await sql<{ following: number | string; lost: number | string; changes: number | string }>`
+      select
+        (select count(*) from mp_followers where lost_at is null) as following,
+        (select count(*) from mp_followers where lost_at is not null) as lost,
+        (select count(*) from mp_follower_events) as changes
+    `;
+    type Row = {
+      id: number | string | null;
+      uid: string;
+      name: string;
+      handle: string;
+      avatar: string | null;
+      baseline: boolean | string | null;
+      followed_at: string | null;
+      lost_at: string | null;
+      action: string | null;
+      detected_at: string | null;
+    };
+    const rows =
+      view === "changes"
+        ? await sql<Row>`
+            select e.id, e.uid, e.name, e.handle, f.avatar, f.baseline, f.followed_at, f.lost_at,
+                   e.action, e.detected_at
+            from mp_follower_events e
+            left join mp_followers f on f.uid = e.uid
+            order by e.detected_at desc
+            limit 400
+          `
+        : view === "lost"
+          ? await sql<Row>`
+              select null as id, uid, name, handle, avatar, baseline, followed_at, lost_at,
+                     'unfollow' as action, lost_at as detected_at
+              from mp_followers
+              where lost_at is not null
+              order by lost_at desc
+              limit 400
+            `
+          : await sql<Row>`
+              select null as id, uid, name, handle, avatar, baseline, followed_at, lost_at,
+                     null as action, followed_at as detected_at
+              from mp_followers
+              where lost_at is null
+              order by baseline asc, followed_at desc
+              limit 500
+            `;
+    const sync = syncRows[0];
+    return {
+      view,
+      note: sync?.note ?? "",
+      complete: sync ? flag(sync.complete) : false,
+      scannedAt: asIso(sync?.scanned_at),
+      totalReported: Number(sync?.total_reported) || 0,
+      followingCount: Number(counts[0]?.following) || 0,
+      lostCount: Number(counts[0]?.lost) || 0,
+      changeCount: Number(counts[0]?.changes) || 0,
+      rows: rows.map((row, index) => ({
+        id: row.id == null ? `${view}-${row.uid}-${index}` : String(row.id),
+        uid: row.uid,
+        name: row.name || row.handle || row.uid,
+        handle: row.handle || row.uid,
+        avatar: row.avatar || "",
+        baseline: flag(row.baseline),
+        followedAt: asIso(row.followed_at),
+        lostAt: asIso(row.lost_at),
+        action: row.action === "follow" || row.action === "unfollow" ? row.action : null,
+        detectedAt: asIso(row.detected_at),
+      })),
+    };
+  });
+

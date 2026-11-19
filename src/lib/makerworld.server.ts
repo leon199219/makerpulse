@@ -281,6 +281,58 @@ async function enrichModels(models: MwModel[], uid: string): Promise<MwModel[]> 
   return out;
 }
 
+export type MwFan = {
+  uid: string;
+  name: string;
+  handle: string;
+  avatar: string;
+};
+
+export type MwFanList = {
+  total: number;
+  fans: MwFan[];
+  complete: boolean;
+};
+
+const FAN_PAGE = 20;
+
+/** Public follower list. MakerWorld does not include a follow timestamp. */
+export async function fetchFans(uid: string, maxCount: number): Promise<MwFanList> {
+  const fans: MwFan[] = [];
+  const seen = new Set<string>();
+  let offset = 0;
+  let total = 0;
+  const cap = Math.max(0, maxCount);
+  while (fans.length < cap) {
+    const raw = (await mwGet(
+      `/design-user-service/user/${encodeURIComponent(uid)}/fans?offset=${offset}&limit=${FAN_PAGE}`,
+    )) as Json;
+    total = num(raw.total);
+    const hits = Array.isArray(raw.hits) ? (raw.hits as Json[]) : [];
+    if (hits.length === 0) break;
+    for (const hit of hits) {
+      const id = str(hit.uid);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const handle = str(hit.handle) || str(hit.name) || id;
+      fans.push({
+        uid: id,
+        name: str(hit.name) || handle,
+        handle,
+        avatar: str(hit.avatar),
+      });
+      if (fans.length >= cap) break;
+    }
+    offset += hits.length;
+    if (offset >= total) break;
+  }
+  return {
+    total,
+    fans,
+    complete: total === 0 ? fans.length === 0 : offset >= total || fans.length >= total,
+  };
+}
+
 export async function resolveCreator(input: string): Promise<{ uid: string; handle: string }> {
   const parsed = parseCreatorInput(input);
   if (parsed.kind === "uid") {
