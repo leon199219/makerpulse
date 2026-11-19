@@ -4,6 +4,19 @@ User-facing changes to MakerPulse. Newest first.
 
 Image: `ghcr.io/leon199219/makerpulse:latest`
 
+## 2026-11-19
+
+### Added
+
+- Follower log. Each sync reads MakerWorld's public follower list and records who started or stopped following. The time is when MakerPulse first saw the change, not a date from MakerWorld. People who already followed you on the first sync are listed without a follow date.
+- Followers page, Activity lines ("Started following" / "Stopped following"), and the same names in Telegram when stats change or in the periodic summary.
+- `GET /api/stats` adds `recent_followers` for the last 24 hours.
+
+### Notes
+
+- Accounts with more than 1,000 followers only have the first 200 names checked each sync. Unfollows are not inferred from that sample.
+- Reset tracking data also clears the follower log.
+
 ## 2026-11-06
 
 ### Added

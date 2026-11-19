@@ -27,6 +27,9 @@ export type EventRow = {
   previous: number;
   current: number;
   delta: number;
+  followerUid: string | null;
+  followerHandle: string | null;
+  followerAction: "follow" | "unfollow" | null;
 };
 
 export type PublicSettings = {
@@ -61,6 +64,33 @@ export type DashboardPayload = {
   removedProfiles: ModelRow[];
   events: EventRow[];
   modelCount: number;
+};
+
+export type FollowerView = "changes" | "following" | "lost";
+
+export type FollowerListRow = {
+  id: string;
+  uid: string;
+  name: string;
+  handle: string;
+  avatar: string;
+  baseline: boolean;
+  followedAt: string | null;
+  lostAt: string | null;
+  action: "follow" | "unfollow" | null;
+  detectedAt: string | null;
+};
+
+export type FollowerPage = {
+  view: FollowerView;
+  note: string;
+  complete: boolean;
+  scannedAt: string | null;
+  totalReported: number;
+  followingCount: number;
+  lostCount: number;
+  changeCount: number;
+  rows: FollowerListRow[];
 };
 
 export type { PeriodKey };

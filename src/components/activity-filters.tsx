@@ -89,8 +89,8 @@ export function ActivityFilters({
         <Input
           value={value.query}
           onChange={(e) => onChange({ ...value, query: e.target.value })}
-          placeholder="Filter by model or account"
-          aria-label="Filter by model or account"
+          placeholder="Filter by model, account, or follower"
+          aria-label="Filter by model, account, or follower"
           className="pl-10"
         />
       </div>

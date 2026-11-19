@@ -16,6 +16,29 @@ export type TelegramEvent = {
   delta: number;
 };
 
+export type TelegramFollowerChange = {
+  name: string;
+  handle: string;
+  action: "follow" | "unfollow";
+};
+
+function followerNet(changes: TelegramFollowerChange[]): number {
+  return changes.reduce((sum, change) => sum + (change.action === "follow" ? 1 : -1), 0);
+}
+
+function followerLines(changes: TelegramFollowerChange[]): string[] {
+  if (changes.length === 0) return [];
+  const lines = ["", "<b>Followers</b>"];
+  const cap = 15;
+  for (const change of changes.slice(0, cap)) {
+    const verb = change.action === "follow" ? "followed" : "unfollowed";
+    const handle = change.handle ? ` <i>@${escapeHtml(change.handle)}</i>` : "";
+    lines.push(`• ${escapeHtml(change.name || change.handle)}${handle} ${verb}`);
+  }
+  if (changes.length > cap) lines.push(`• …and ${changes.length - cap} more`);
+  return lines;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -54,15 +77,21 @@ export function formatChangeDigest(input: {
   handle: string;
   events: TelegramEvent[];
   includeModels: boolean;
+  followerChanges?: TelegramFollowerChange[];
 }): string {
   const { creatorName, handle, events, includeModels } = input;
-  const account = events.filter((e) => !e.designTitle);
-  const models = events.filter((e) => e.designTitle);
+  const named = input.followerChanges ?? [];
+  const followerDelta = events.find((event) => !event.designTitle && event.metric === "followers")?.delta;
+  const hideCount = named.length > 0 && followerDelta === followerNet(named);
+  const account = events.filter(
+    (event) => !event.designTitle && !(hideCount && event.metric === "followers"),
+  );
+  const models = events.filter((event) => event.designTitle);
   const lines = [
     `<b>MakerPulse</b> · ${escapeHtml(creatorName)} <i>@${escapeHtml(handle)}</i>`,
     "",
   ];
-  if (account.length === 0 && models.length === 0) {
+  if (account.length === 0 && models.length === 0 && named.length === 0) {
     lines.push("No stat changes since the last check.");
     return lines.join("\n");
   }
@@ -96,6 +125,7 @@ export function formatChangeDigest(input: {
       shown += 1;
     }
   }
+  lines.push(...followerLines(named));
   return lines.join("\n");
 }
 
@@ -107,18 +137,25 @@ export function formatPeriodicSummary(input: {
   modelCount: number;
   windowLabel: string;
   modelChanges?: { title: string; changes: { metric: Metric; delta: number }[] }[];
+  followerChanges?: TelegramFollowerChange[];
 }): string {
   const { creatorName, handle, totals, deltas, modelCount, windowLabel, modelChanges } = input;
+  const named = input.followerChanges ?? [];
+  const hideCount = named.length > 0 && deltas.followers === followerNet(named);
   const lines = [
     `<b>MakerPulse summary</b> · ${escapeHtml(windowLabel)}`,
     `${escapeHtml(creatorName)} <i>@${escapeHtml(handle)}</i> · ${modelCount} models`,
     "",
-    "<b>Account</b>",
   ];
-  const moved = (Object.keys(totals) as Metric[]).filter((metric) => deltas[metric] !== 0);
+  const moved = (Object.keys(totals) as Metric[]).filter(
+    (metric) => deltas[metric] !== 0 && !(hideCount && metric === "followers"),
+  );
   if (moved.length === 0) {
-    lines.push("No account changes in this period.");
+    if (named.length === 0) {
+      lines.push("<b>Account</b>", "No account changes in this period.");
+    }
   } else {
+    lines.push("<b>Account</b>");
     for (const metric of moved) {
       lines.push(
         `• ${METRIC_LABELS[metric]}: ${formatExact(totals[metric])} (${formatDelta(deltas[metric])})`,
@@ -138,6 +175,7 @@ export function formatPeriodicSummary(input: {
       lines.push(`• …and ${modelChanges.length - cap} more models`);
     }
   }
+  lines.push(...followerLines(named));
   return lines.join("\n");
 }
 

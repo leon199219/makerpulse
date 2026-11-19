@@ -22,7 +22,7 @@ export const Route = createFileRoute("/activity")({
 function matchesFilters(event: EventRow, filters: ActivityFilterState): boolean {
   const query = filters.query.trim().toLowerCase();
   if (query) {
-    const hay = `${event.title ?? "Account"} ${event.designId ?? ""} ${event.profileId ?? ""}`.toLowerCase();
+    const hay = `${event.title ?? "Account"} ${event.designId ?? ""} ${event.profileId ?? ""} ${event.followerHandle ?? ""}`.toLowerCase();
     if (!hay.includes(query)) return false;
   }
   if (filters.metric !== "all" && event.metric !== filters.metric) return false;
