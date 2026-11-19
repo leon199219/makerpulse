@@ -70,8 +70,6 @@ export function ratingAverage(rating: RatingBlock): number | null {
   return rating.scoreTotal / rating.count;
 }
 
-export const MILESTONE_STEPS = [100, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000] as const;
-
 export const EMPTY_STATS: StatBlock = {
   likes: 0,
   collections: 0,

@@ -6,7 +6,15 @@ import {
   resolveCreator,
   type MwSnapshot,
 } from "@/lib/makerworld.server";
-import { EMPTY_STATS, METRICS, MILESTONE_STEPS, MODEL_METRICS, estimatePoints, type Metric, type RatingBlock, type StatBlock } from "@/lib/metrics";
+import { EMPTY_STATS, METRICS, MODEL_METRICS, estimatePoints, type Metric, type RatingBlock, type StatBlock } from "@/lib/metrics";
+import {
+  claimMilestones,
+  markMilestonesNotified,
+  markMilestonesReplayed,
+  milestonesReplayed,
+  pendingMilestones,
+  replayMilestones,
+} from "@/lib/milestones.server";
 import {
   formatChangeDigest,
   formatMilestones,
@@ -151,33 +159,6 @@ async function insertSnapshot(
   `;
 }
 
-async function claimMilestones(
-  designId: string,
-  title: string,
-  previous: StatBlock | null,
-  next: StatBlock,
-): Promise<MilestoneHit[]> {
-  const sql = await getSql();
-  const hits: MilestoneHit[] = [];
-  for (const metric of ["downloads", "boosts"] as const) {
-    for (const threshold of MILESTONE_STEPS) {
-      if (next[metric] < threshold) continue;
-      const crossed = previous != null && previous[metric] < threshold;
-      if (previous != null && !crossed) continue;
-      const inserted = await sql<{ id: number }>`
-        insert into mp_milestones (design_id, metric, threshold, value)
-        values (${designId}, ${metric}, ${threshold}, ${next[metric]})
-        on conflict (design_id, metric, threshold) do nothing
-        returning id
-      `;
-      if (crossed && inserted.length) {
-        hits.push({ title, metric, threshold, value: next[metric] });
-      }
-    }
-  }
-  return hits;
-}
-
 async function recordEvents(
   designId: string | null,
   previous: StatBlock,
@@ -266,31 +247,45 @@ async function maybeTelegram(
   settings: SettingsRow,
   snapshot: MwSnapshot,
   events: TelegramEvent[],
-  milestones: MilestoneHit[],
   followerChanges: FollowerChange[],
+  catchUp: boolean,
 ): Promise<void> {
+  const pending = await pendingMilestones();
+  const hidden = pending.filter((hit) => hit.designId !== "" && !settings.telegram_include_models);
+  await markMilestonesNotified(hidden.map((hit) => hit.id));
+  const visible = pending.filter((hit) => hit.designId === "" || settings.telegram_include_models);
   if (!settings.telegram_enabled || !settings.telegram_bot_token || !settings.telegram_chat_id) {
+    await markMilestonesNotified(visible.map((hit) => hit.id));
+    if (catchUp) await markMilestonesReplayed();
     return;
   }
+  const batch = visible.slice(0, 80);
+  const hits: MilestoneHit[] = batch.map((hit) => ({
+    id: hit.id,
+    title: hit.title,
+    metric: hit.metric,
+    threshold: hit.threshold,
+    value: hit.value,
+  }));
+  const messages = formatMilestones({
+    creatorName: snapshot.profile.name,
+    handle: snapshot.profile.handle,
+    hits,
+    catchUp,
+    more: visible.length - hits.length,
+  });
+  for (let index = 0; index < messages.length; index += 1) {
+    const html = messages[index];
+    if (!html) continue;
+    await sendTelegramMessage(settings.telegram_bot_token, settings.telegram_chat_id, html);
+    await markMilestonesNotified(hits.slice(index * 20, index * 20 + 20).map((hit) => hit.id));
+  }
+  if (catchUp) await markMilestonesReplayed();
+
   const now = Date.now();
   const last = settings.last_telegram_at ? new Date(settings.last_telegram_at).getTime() : 0;
   const due = now - last >= cadenceMs(settings.telegram_cadence);
   const sql = await getSql();
-
-  const visibleMilestones = milestones.filter(
-    (hit) => hit.title === "Account" || settings.telegram_include_models,
-  );
-  if (visibleMilestones.length) {
-    await sendTelegramMessage(
-      settings.telegram_bot_token,
-      settings.telegram_chat_id,
-      formatMilestones({
-        creatorName: snapshot.profile.name,
-        handle: snapshot.profile.handle,
-        hits: visibleMilestones,
-      }),
-    );
-  }
 
   if (settings.telegram_on_change && (events.length || followerChanges.length)) {
     const html = formatChangeDigest({
@@ -396,17 +391,18 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
     const accountEvents = prevAccountRow
       ? await recordEvents(null, prevAccount, snapshot.totals, METRICS)
       : [];
-    const milestones = await claimMilestones(
-      "",
-      "Account",
-      prevAccountRow ? prevAccount : null,
-      snapshot.totals,
-    );
+    const replayed = await milestonesReplayed();
+    if (replayed) {
+      await claimMilestones({
+        designId: "",
+        previous: prevAccountRow ? prevAccount : null,
+        next: snapshot.totals,
+        model: false,
+      });
+    }
 
     const allEvents: TelegramEvent[] = [...accountEvents];
-    const titles = new Map<string, string>();
     for (const model of snapshot.models) {
-      titles.set(model.designId, model.title);
       await sql`
         insert into mp_models (design_id, title, slug, cover_url, is_exclusive, published_at, last_seen_at)
         values (
@@ -439,9 +435,14 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
       const prevRow = await latestSnapshot(model.designId);
       const prev = rowStats(prevRow);
       await insertSnapshot(model.designId, stats, rating);
-      milestones.push(
-        ...(await claimMilestones(model.designId, model.title, prevRow ? prev : null, stats)),
-      );
+      if (replayed) {
+        await claimMilestones({
+          designId: model.designId,
+          previous: prevRow ? prev : null,
+          next: stats,
+          model: true,
+        });
+      }
       if (!prevRow) continue;
       const modelEvents = await recordEvents(
         model.designId,
@@ -549,7 +550,9 @@ export async function runPoll(): Promise<{ ok: boolean; error?: string; events: 
       console.error("[makerpulse] follower sync failed", err);
     }
 
-    await maybeTelegram(settings, snapshot, allEvents, milestones, followerChanges);
+    if (!replayed) await replayMilestones();
+
+    await maybeTelegram(settings, snapshot, allEvents, followerChanges, !replayed);
     return { ok: true, events: allEvents.length };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
