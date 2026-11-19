@@ -12,6 +12,11 @@ Image: `ghcr.io/leon199219/makerpulse:latest`
 - Followers page, Activity lines ("Started following" / "Stopped following"), and the same names in Telegram when stats change or in the periodic summary.
 - `GET /api/stats` adds `recent_followers` for the last 24 hours.
 
+### Changed
+
+- Telegram milestones now cover likes, collections, prints, downloads, comments, boosts, and followers. Steps are 1, 5, 10, 25, 50, 100, 250, 500, and higher. Previously only downloads and boosts were sent, and only from 100 upward in large jumps.
+- The next sync also sends levels that were crossed while MakerPulse was already tracking and never announced. Levels already passed on the very first sync stay quiet. A long backlog continues on the following syncs.
+
 ### Notes
 
 - Accounts with more than 1,000 followers only have the first 200 names checked each sync. Unfollows are not inferred from that sample.

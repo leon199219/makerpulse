@@ -180,8 +180,9 @@ export function formatPeriodicSummary(input: {
 }
 
 export type MilestoneHit = {
+  id: number;
   title: string;
-  metric: "downloads" | "boosts";
+  metric: Metric;
   threshold: number;
   value: number;
 };
@@ -190,16 +191,38 @@ export function formatMilestones(input: {
   creatorName: string;
   handle: string;
   hits: MilestoneHit[];
-}): string {
-  const lines = [
-    `<b>MakerPulse milestone</b>`,
-    `${escapeHtml(input.creatorName)} <i>@${escapeHtml(input.handle)}</i>`,
-    "",
-  ];
-  for (const hit of input.hits) {
-    lines.push(
-      `• ${escapeHtml(hit.title)} reached ${formatExact(hit.threshold)} ${METRIC_LABELS[hit.metric]} (now ${formatExact(hit.value)})`,
-    );
+  catchUp: boolean;
+  more: number;
+}): string[] {
+  const chunks: MilestoneHit[][] = [];
+  for (let index = 0; index < input.hits.length; index += 20) {
+    chunks.push(input.hits.slice(index, index + 20));
   }
-  return lines.join("\n");
+  if (chunks.length === 0) return [];
+  return chunks.map((chunk, index) => {
+    const lines = [
+      `<b>MakerPulse milestone</b>`,
+      `${escapeHtml(input.creatorName)} <i>@${escapeHtml(input.handle)}</i>`,
+    ];
+    if (input.catchUp && index === 0) {
+      lines.push(
+        "Levels crossed while tracking. Older alerts only watched a few download and boost steps, so these were not sent.",
+      );
+    }
+    lines.push("");
+    let current = "";
+    for (const hit of chunk) {
+      if (hit.title !== current) {
+        current = hit.title;
+        lines.push(`<b>${escapeHtml(hit.title)}</b>`);
+      }
+      lines.push(
+        `• ${formatExact(hit.threshold)} ${METRIC_LABELS[hit.metric]} (now ${formatExact(hit.value)})`,
+      );
+    }
+    if (index === chunks.length - 1 && input.more > 0) {
+      lines.push("", `${input.more} more milestones follow on the next sync.`);
+    }
+    return lines.join("\n");
+  });
 }
