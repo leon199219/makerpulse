@@ -118,10 +118,15 @@ Update later from the same folder: `docker compose up -d --build`.
 
 ## Environment
 
+A list of every variable, with dummy values, is in [`.env.example`](.env.example). Copy it to `.env`. That file is gitignored. See [SECURITY.md](SECURITY.md).
+
+Change the default database password `makerpulse:makerpulse` before you use this outside a local demo.
+
 | Variable | Required | Description |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Postgres URL |
 | `MAKERWORLD_UID` | No | Numeric MakerWorld user ID (or set in the UI) |
+| `MAKERWORLD_HANDLE` | No | Optional MakerWorld handle (or set in the UI) |
 | `POLL_INTERVAL_MINUTES` | No | Starting value only (`30`). After you save Settings, the app uses that interval |
 | `TELEGRAM_BOT_TOKEN` | No | BotFather token |
 | `TELEGRAM_CHAT_ID` | No | Chat or group ID |
